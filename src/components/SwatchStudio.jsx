@@ -372,9 +372,9 @@ export default function SwatchStudio() {
       )}
 
       {/* Update banner */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 text-center py-1 text-[9px] text-white/60"
-        style={{ background: S.headerBg, borderTop: `1px solid ${S.divider}` }}>
-        v6.3 · {new Date().toLocaleDateString('en-CA')}
+      <div className="fixed bottom-0 left-0 right-0 z-50 text-center py-1.5 text-[11px] font-bold text-white"
+        style={{ background: 'var(--theme-accent)', color: '#000' }}>
+        v6.4 LIVE
       </div>
 
       {/* HexPopup — preserved for Scanned tab only */}
