@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: swatch-studio-api
+    runtime: node
+    buildCommand: npm install
+    startCommand: node src/index.js
+    envVars:
+      - key: COLORHUNT_SYNC_API_KEY
+        generateValue: true
+      - key: NODE_ENV
+        value: production

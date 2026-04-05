@@ -30,6 +30,9 @@ dist-ssr
 # Archives
 *.zip
 
-# Old versions
-SwatchStudio.jsx
-SwatchStudio_README.md
+# Old versions in root
+/SwatchStudio.jsx
+/SwatchStudio_README.md
+
+# Local Netlify folder
+.netlify
