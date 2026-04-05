@@ -374,7 +374,7 @@ export default function SwatchStudio() {
       {/* Update banner */}
       <div className="fixed bottom-0 left-0 right-0 z-50 text-center py-1.5 text-[11px] font-bold text-white"
         style={{ background: 'var(--theme-accent)', color: '#000' }}>
-        v6.5 LIVE
+        v6.6 LIVE
       </div>
 
       {/* HexPopup — preserved for Scanned tab only */}
@@ -407,9 +407,9 @@ export default function SwatchStudio() {
         {/* ═══ ZONE 1: Header ═══ */}
         <header className="flex-shrink-0 flex items-center px-4 py-1.5 relative"
           style={{ background: S.headerBg, borderBottom: `1.5px solid ${S.divider}` }}>
-          <img src={logo} alt="PaintBrain" className="w-[60px] h-[60px] rounded-xl object-cover flex-shrink-0"
+          <img src={logo} alt="PaintBrain" className="w-[75px] h-[75px] rounded-xl object-cover flex-shrink-0"
             onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}/>
-          <div className="w-[60px] h-[60px] rounded-xl hidden items-center justify-center flex-shrink-0"
+          <div className="w-[75px] h-[75px] rounded-xl hidden items-center justify-center flex-shrink-0"
             style={{ background: 'linear-gradient(135deg,#471396,#EA2264,#EB5B00)' }}/>
           <div className="flex-1 flex flex-col items-center">
             <div className="text-base font-bold text-white tracking-[0.2em] leading-none">SWATCH</div>
@@ -682,29 +682,19 @@ export default function SwatchStudio() {
                 <span className="text-[9px] text-white/40 w-8 text-right">{zoomCols}col</span>
               </div>
 
-              {COLOR_FAMILIES.map(fam => (
-                <div key={fam.id} className="rounded-xl p-2 transition-colors"
-                  style={{ border: `1.5px solid ${S.divider}` }}>
-                  <div className="text-[9px] font-medium tracking-widest uppercase text-white/60 mb-1 px-0.5">
-                    {fam.name} <span className="text-white/30">· {fam.colors.length}</span>
-                  </div>
-                  <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${zoomCols}, 1fr)` }}>
-                    {fam.colors.map(c => (
-                      <div key={c.hex}>
-                        <div onClick={() => addToTray(c)}
-                          style={{
-                            background: c.hex,
-                            border: inTray(c.hex) ? `2px solid ${S.accent}` : `1px solid ${S.divider}`,
-                            boxShadow: inTray(c.hex) ? `0 0 6px color-mix(in srgb, ${S.accent} 30%, transparent)` : 'none',
-                          }}
-                          className={`aspect-square rounded cursor-pointer transition-all hover:scale-105 hover:z-10 ${zoomSize}`}
-                          title={`${c.name} ${c.hex}`}/>
-                        {showHex && <div className="text-[7px] font-mono text-white/30 text-center mt-0.5 truncate">{c.hex}</div>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+              <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${zoomCols}, 1fr)` }}>
+                {COLOR_FAMILIES.flatMap(fam => fam.colors).map((c, i) => (
+                  <div key={c.hex + i} onClick={() => addToTray(c)}
+                    style={{
+                      background: c.hex,
+                      outline: inTray(c.hex) ? `2px solid ${S.accent}` : 'none',
+                      outlineOffset: inTray(c.hex) ? '-2px' : '0',
+                      zIndex: inTray(c.hex) ? 10 : 0,
+                    }}
+                    className="aspect-square cursor-pointer transition-transform hover:scale-110 hover:z-20"
+                    title={`${c.name} ${c.hex}`}/>
+                ))}
+              </div>
             </div>
           )}
 
