@@ -1,0 +1,309 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{--bg:#0e0e12;--border:rgba(255,255,255,0.07);--text:#e8e4f4;--text2:#9188aa;--text3:#504860;}
+body{font-family:var(--font-sans,system-ui,sans-serif);color:var(--text);}
+.wrap{background:var(--bg);border-radius:16px;border:1px solid rgba(140,107,255,0.3);overflow:hidden;}
+.toolbar{padding:9px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);}
+.breadcrumb{display:flex;align-items:center;gap:4px;flex:1;}
+.bc-item{font-size:12px;color:var(--text2);cursor:pointer;padding:3px 6px;border-radius:5px;transition:background .1s;}
+.bc-item:hover{background:rgba(255,255,255,0.05);}
+.bc-item.current{color:var(--text);cursor:default;}
+.bc-item.current:hover{background:transparent;}
+.bc-sep{font-size:12px;color:var(--text3);}
+.view-hint{font-size:10px;color:var(--text3);white-space:nowrap;}
+.chart-area{padding:12px 14px;}
+.family-block{cursor:pointer;border-radius:8px;border:1px solid transparent;padding:4px;transition:border-color .15s,background .15s;margin-bottom:6px;}
+.family-block:hover{border-color:rgba(140,107,255,0.4);background:rgba(140,107,255,0.04);}
+.family-name{font-size:9px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);margin-bottom:3px;display:flex;align-items:center;justify-content:space-between;}
+.family-name span{font-size:9px;color:var(--text3);opacity:0.6;}
+.micro-grid{display:flex;flex-wrap:wrap;gap:1px;}
+.micro-chip{border-radius:2px;border:none;cursor:pointer;}
+.detail-grid{display:grid;gap:3px;}
+.detail-chip{border-radius:4px;cursor:pointer;position:relative;border:0.5px solid rgba(255,255,255,0.0);transition:transform .1s;}
+.detail-chip:hover{transform:scale(1.12);z-index:10;border-color:rgba(255,255,255,0.3);}
+.detail-chip.sel{transform:scale(1.12);z-index:10;border:2px solid rgba(255,255,255,0.9) !important;}
+.chip-label{font-size:8px;color:rgba(255,255,255,0.7);text-align:center;margin-top:2px;font-family:var(--font-mono,monospace);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.action-bar{border-top:1px solid var(--border);padding:9px 14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-height:48px;}
+.abtn{padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:11px;cursor:pointer;transition:all .12s;white-space:nowrap;}
+.abtn:hover{border-color:rgba(140,107,255,0.5);color:var(--text);}
+.abtn.hi{border-color:rgba(140,107,255,0.4);color:#8CABFF;}
+.sel-sw{width:28px;height:28px;border-radius:5px;flex-shrink:0;border:0.5px solid rgba(255,255,255,0.1);}
+.sel-hex{font-size:13px;font-weight:500;color:var(--text);font-family:var(--font-mono,monospace);}
+.sel-nm{font-size:10px;color:var(--text2);}
+.back-btn{display:flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:all .12s;}
+.back-btn:hover{border-color:rgba(140,107,255,0.4);color:var(--text);}
+.back-btn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;}
+.tray-mini{display:flex;gap:3px;flex-wrap:wrap;padding:8px 14px;border-top:1px solid var(--border);}
+.tray-chip-mini{width:20px;height:20px;border-radius:3px;border:0.5px solid rgba(255,255,255,0.08);}
+.tray-label{font-size:10px;color:var(--text3);align-self:center;margin-right:2px;}
+</style>
+
+<div style="padding:1rem 0;">
+<div class="wrap">
+
+  <div class="toolbar">
+    <div class="breadcrumb" id="breadcrumb">
+      <span class="bc-item current">All colors</span>
+    </div>
+    <span class="view-hint" id="view-hint">Tap a family to zoom in</span>
+  </div>
+
+  <div class="chart-area" id="chart-area"></div>
+
+  <div id="tray-bar" style="display:none;">
+    <div class="tray-mini" id="tray-mini">
+      <span class="tray-label">Palette:</span>
+    </div>
+  </div>
+
+  <div class="action-bar" id="action-bar">
+    <span style="font-size:11px;color:var(--text3);">Tap a color to select · tap a family block to zoom in</span>
+  </div>
+
+</div>
+</div>
+
+<script>
+const FAMILIES = [
+  { id:'yellows', name:'Yellows', colors:[
+    {h:"#FFFFF0",n:"Ivory"},{h:"#FFFFE0",n:"Light yellow"},{h:"#FFFF99",n:"Canary"},{h:"#FFFF00",n:"Yellow"},
+    {h:"#FFD700",n:"Gold"},{h:"#FFC200",n:"Amber gold"},{h:"#FFB300",n:"Marigold"},{h:"#FFA000",n:"Dark amber"},
+    {h:"#E6AC00",n:"Deep gold"},{h:"#CC9900",n:"Ochre"},{h:"#B8860B",n:"Dark goldenrod"},{h:"#9A7B00",n:"Harvest"},
+    {h:"#8B7536",n:"Antique gold"},{h:"#7B6914",n:"Bronze"},{h:"#6B5A00",n:"Dark bronze"},{h:"#FFEC8B",n:"Light goldenrod"},
+  ]},
+  { id:'oranges', name:'Oranges', colors:[
+    {h:"#FFE4B5",n:"Moccasin"},{h:"#FFD5A8",n:"Peach cream"},{h:"#FFCC99",n:"Peach"},{h:"#FFB347",n:"Pastel orange"},
+    {h:"#FF8C42",n:"Mango"},{h:"#FF7518",n:"Pumpkin"},{h:"#FF6200",n:"Blaze"},{h:"#F05000",n:"Burnt orange"},
+    {h:"#E04000",n:"Deep orange"},{h:"#CC3300",n:"Rust"},{h:"#B03000",n:"Brick"},{h:"#8B2500",n:"Dark brick"},
+    {h:"#F78D60",n:"Warm peach"},{h:"#F0CAA3",n:"Sand"},{h:"#EB5B00",n:"Blaze orange"},{h:"#B12C00",n:"Burnt crimson"},
+  ]},
+  { id:'reds', name:'Reds', colors:[
+    {h:"#FFE4E1",n:"Misty rose"},{h:"#FFB3B3",n:"Blush"},{h:"#FF8080",n:"Salmon"},{h:"#FF4444",n:"Tomato"},
+    {h:"#FF0000",n:"Red"},{h:"#E00000",n:"Crimson"},{h:"#C00000",n:"Dark red"},{h:"#A00000",n:"Deep red"},
+    {h:"#800000",n:"Maroon"},{h:"#AE2448",n:"Ruby"},{h:"#8B0000",n:"Dark maroon"},{h:"#6B0000",n:"Blood red"},
+    {h:"#DC143C",n:"Crimson classic"},{h:"#B22222",n:"Firebrick"},{h:"#CD5C5C",n:"Indian red"},{h:"#FA8072",n:"Salmon pink"},
+  ]},
+  { id:'pinks', name:'Pinks & magentas', colors:[
+    {h:"#FFE4EE",n:"Fairy"},{h:"#FFD1DC",n:"Petal"},{h:"#FFB6C1",n:"Light pink"},{h:"#FF69B4",n:"Hot pink"},
+    {h:"#FF1493",n:"Deep pink"},{h:"#EA2264",n:"Hot magenta"},{h:"#C060A1",n:"Orchid"},{h:"#FF00FF",n:"Magenta"},
+    {h:"#EE82EE",n:"Violet pink"},{h:"#DA70D6",n:"Orchid pink"},{h:"#BA55D3",n:"Medium orchid"},{h:"#9932CC",n:"Dark orchid"},
+    {h:"#8B008B",n:"Dark magenta"},{h:"#800080",n:"Purple"},{h:"#660066",n:"Dark purple"},{h:"#FF77FF",n:"Light magenta"},
+  ]},
+  { id:'purples', name:'Purples & violets', colors:[
+    {h:"#F0E6FF",n:"Lavender white"},{h:"#E8D5FF",n:"Lavender mist"},{h:"#CC99FF",n:"Light violet"},{h:"#B13BFF",n:"Electric"},
+    {h:"#8B00FF",n:"Violet"},{h:"#7B00E0",n:"Deep violet"},{h:"#6A00C0",n:"Royal violet"},{h:"#5900A0",n:"Indigo violet"},
+    {h:"#471396",n:"Electric violet"},{h:"#3B185F",n:"Dark grape"},{h:"#320A6B",n:"Deep violet"},{h:"#35155D",n:"Midnight plum"},
+    {h:"#512B81",n:"Royal purple"},{h:"#640D5F",n:"Deep magenta"},{h:"#090040",n:"Void"},{h:"#9B59B6",n:"Amethyst"},
+  ]},
+  { id:'blues', name:'Blues & indigos', colors:[
+    {h:"#EEF4FF",n:"Alice blue"},{h:"#E6F0FF",n:"Ice blue"},{h:"#B3CCFF",n:"Periwinkle lt"},{h:"#8CABFF",n:"Periwinkle"},
+    {h:"#4477CE",n:"Cornflower"},{h:"#1E90FF",n:"Dodger blue"},{h:"#0066CC",n:"Strong blue"},{h:"#065084",n:"Ocean blue"},
+    {h:"#0D1164",n:"Indigo night"},{h:"#00005C",n:"Abyss navy"},{h:"#000080",n:"Navy"},{h:"#00004B",n:"Dark navy"},
+    {h:"#4169E1",n:"Royal blue"},{h:"#6495ED",n:"Cornflower web"},{h:"#ADD8E6",n:"Light blue"},{h:"#87CEEB",n:"Sky blue"},
+  ]},
+  { id:'teals', name:'Teals & cyans', colors:[
+    {h:"#E0FFFF",n:"Light cyan"},{h:"#AFEEEE",n:"Pale turquoise"},{h:"#00FFFF",n:"Cyan"},{h:"#00CED1",n:"Dark turquoise"},
+    {h:"#20B2AA",n:"Light sea green"},{h:"#008B8B",n:"Dark cyan"},{h:"#0F828C",n:"Deep teal"},{h:"#006064",n:"Dark teal"},
+    {h:"#78B9B5",n:"Muted teal"},{h:"#4DB6AC",n:"Medium teal"},{h:"#00897B",n:"Teal green"},{h:"#00695C",n:"Dark teal grn"},
+    {h:"#26C6DA",n:"Cyan accent"},{h:"#00ACC1",n:"Teal"},{h:"#48D1CC",n:"Medium turq"},{h:"#40E0D0",n:"Turquoise"},
+  ]},
+  { id:'greens', name:'Greens', colors:[
+    {h:"#F0FFF0",n:"Honeydew"},{h:"#E8F5E9",n:"Mint cream"},{h:"#C8E6C9",n:"Light green"},{h:"#A5D6A7",n:"Soft green"},
+    {h:"#66BB6A",n:"Medium green"},{h:"#43A047",n:"Green"},{h:"#2E7D32",n:"Dark green"},{h:"#1B5E20",n:"Forest"},
+    {h:"#8BC34A",n:"Yellow green"},{h:"#CDDC39",n:"Lime"},{h:"#AFB42B",n:"Dark lime"},{h:"#827717",n:"Olive"},
+    {h:"#558B2F",n:"Fern"},{h:"#33691E",n:"Avocado"},{h:"#00C853",n:"Bright green"},{h:"#69F0AE",n:"Light accent"},
+  ]},
+  { id:'neutrals', name:'Neutrals & browns', colors:[
+    {h:"#FFFFFF",n:"White"},{h:"#F5F5F5",n:"Whitesmoke"},{h:"#E0E0E0",n:"Gainsboro"},{h:"#BDBDBD",n:"Light gray"},
+    {h:"#9E9E9E",n:"Gray"},{h:"#757575",n:"Dark gray"},{h:"#616161",n:"Charcoal"},{h:"#424242",n:"Slate"},
+    {h:"#212121",n:"Near black"},{h:"#111111",n:"Dark"},{h:"#D2691E",n:"Chocolate"},{h:"#8B4513",n:"Saddle brown"},
+    {h:"#A0522D",n:"Sienna"},{h:"#DEB887",n:"Burlywood"},{h:"#F5DEB3",n:"Wheat"},{h:"#FAEBD7",n:"Antique white"},
+  ]},
+];
+
+let view = 'overview';
+let activeFamilyId = null;
+let selectedColor = null;
+let tray = [];
+
+function renderOverview() {
+  view = 'overview';
+  activeFamilyId = null;
+  document.getElementById('view-hint').textContent = 'Tap a family to zoom in';
+  setBreadcrumb([{label:'All colors', action:null}]);
+
+  const area = document.getElementById('chart-area');
+  area.innerHTML = '';
+
+  FAMILIES.forEach(fam => {
+    const block = document.createElement('div');
+    block.className = 'family-block';
+
+    const nameRow = document.createElement('div');
+    nameRow.className = 'family-name';
+    nameRow.innerHTML = `${fam.name} <span>${fam.colors.length} colors →</span>`;
+    block.appendChild(nameRow);
+
+    const grid = document.createElement('div');
+    grid.className = 'micro-grid';
+    fam.colors.forEach(c => {
+      const chip = document.createElement('div');
+      chip.className = 'micro-chip';
+      chip.style.cssText = `background:${c.h};width:18px;height:18px;`;
+      chip.title = `${c.n} ${c.h}`;
+      chip.onclick = (e) => { e.stopPropagation(); selectColor(c); };
+      grid.appendChild(chip);
+    });
+    block.appendChild(grid);
+
+    block.onclick = () => renderFamily(fam.id);
+    area.appendChild(block);
+  });
+}
+
+function renderFamily(famId) {
+  view = 'family';
+  activeFamilyId = famId;
+  const fam = FAMILIES.find(f => f.id === famId);
+  document.getElementById('view-hint').textContent = 'Tap any color · tap again to deselect';
+  setBreadcrumb([
+    {label:'All colors', action: renderOverview},
+    {label: fam.name, action: null}
+  ]);
+
+  const area = document.getElementById('chart-area');
+  area.innerHTML = '';
+
+  const backBtn = document.createElement('button');
+  backBtn.className = 'back-btn';
+  backBtn.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg> All colors`;
+  backBtn.onclick = renderOverview;
+  backBtn.style.marginBottom = '10px';
+  area.appendChild(backBtn);
+
+  const cols = Math.floor(area.offsetWidth / 56) || 6;
+  const grid = document.createElement('div');
+  grid.className = 'detail-grid';
+  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+  fam.colors.forEach(c => {
+    const cell = document.createElement('div');
+
+    const chip = document.createElement('div');
+    chip.className = 'detail-chip' + (selectedColor && selectedColor.h === c.h ? ' sel' : '');
+    chip.style.cssText = `background:${c.h};height:48px;`;
+    chip.title = `${c.n}`;
+    chip.onclick = () => {
+      if (selectedColor && selectedColor.h === c.h) {
+        selectedColor = null;
+      } else {
+        selectColor(c);
+      }
+      renderFamily(famId);
+    };
+
+    const lbl = document.createElement('div');
+    lbl.className = 'chip-label';
+    lbl.textContent = c.h;
+
+    cell.appendChild(chip);
+    cell.appendChild(lbl);
+    grid.appendChild(cell);
+  });
+
+  area.appendChild(grid);
+}
+
+function selectColor(c) {
+  selectedColor = c;
+  renderActionBar();
+}
+
+function setBreadcrumb(items) {
+  const bc = document.getElementById('breadcrumb');
+  bc.innerHTML = '';
+  items.forEach((item, i) => {
+    const span = document.createElement('span');
+    span.className = 'bc-item' + (item.action ? '' : ' current');
+    span.textContent = item.label;
+    if (item.action) span.onclick = item.action;
+    bc.appendChild(span);
+    if (i < items.length - 1) {
+      const sep = document.createElement('span');
+      sep.className = 'bc-sep';
+      sep.textContent = '›';
+      bc.appendChild(sep);
+    }
+  });
+}
+
+function renderActionBar() {
+  const bar = document.getElementById('action-bar');
+  if (!selectedColor) {
+    bar.innerHTML = `<span style="font-size:11px;color:var(--text3);">Tap a color to select · tap a family block to zoom in</span>`;
+    return;
+  }
+  const c = selectedColor;
+  const inT = tray.some(t => t.h === c.h);
+  bar.innerHTML = `
+    <div class="sel-sw" style="background:${c.h}"></div>
+    <div style="flex:1;min-width:0;">
+      <div class="sel-hex">${c.h}</div>
+      <div class="sel-nm">${c.n}</div>
+    </div>
+    <button class="abtn" onclick="copyHex('${c.h}',this)">Copy</button>
+    <button class="abtn${inT?' ':' hi'}" onclick="toggleTray('${c.h}','${c.n}')">${inT ? 'In palette' : '+ Add'}</button>
+    <button class="abtn" onclick="doSchemes('${c.h}')">Schemes</button>
+  `;
+}
+
+function copyHex(hex, btn) {
+  navigator.clipboard.writeText(hex).catch(()=>{});
+  const o = btn.textContent; btn.textContent = 'Copied!';
+  setTimeout(() => btn.textContent = o, 1200);
+}
+
+function toggleTray(hex, name) {
+  if (tray.some(t => t.h === hex)) {
+    tray = tray.filter(t => t.h !== hex);
+  } else {
+    tray.push({h:hex, n:name});
+  }
+  renderTray();
+  renderActionBar();
+  if (activeFamilyId) renderFamily(activeFamilyId);
+}
+
+function renderTray() {
+  const bar = document.getElementById('tray-bar');
+  const mini = document.getElementById('tray-mini');
+  if (tray.length === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = 'block';
+  mini.innerHTML = `<span class="tray-label">${tray.length} color${tray.length===1?'':'s'}:</span>`;
+  tray.forEach(c => {
+    const chip = document.createElement('div');
+    chip.className = 'tray-chip-mini';
+    chip.style.background = c.h;
+    chip.title = c.h;
+    chip.onclick = () => { tray = tray.filter(t => t.h !== c.h); renderTray(); renderActionBar(); };
+    mini.appendChild(chip);
+  });
+  const copyBtn = document.createElement('button');
+  copyBtn.style.cssText = 'font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid rgba(140,107,255,0.3);background:transparent;color:#8CABFF;cursor:pointer;margin-left:4px;';
+  copyBtn.textContent = 'Copy hex';
+  copyBtn.onclick = () => {
+    navigator.clipboard.writeText(tray.map(c=>c.h).join(', ')).catch(()=>{});
+    copyBtn.textContent = 'Copied!';
+    setTimeout(() => copyBtn.textContent = 'Copy hex', 1200);
+  };
+  mini.appendChild(copyBtn);
+}
+
+function doSchemes(hex) {
+  sendPrompt(`Show me generated color schemes from ${hex} — Generic Gradient, Matching Gradient, Spot Palette, and Twisted Spot`);
+}
+
+renderOverview();
+renderActionBar();
+</script>

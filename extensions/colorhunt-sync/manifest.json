@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "PaintBrain · ColorHunt Sync",
+  "version": "1.0",
+  "description": "Syncs ColorHunt favorites to PaintBrain Swatch Studio automatically",
+  "permissions": ["storage"],
+  "host_permissions": ["https://colorhunt.co/*"],
+  "content_scripts": [{
+    "matches": ["https://colorhunt.co/*"],
+    "js": ["config.js", "content.js"],
+    "run_at": "document_idle"
+  }],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

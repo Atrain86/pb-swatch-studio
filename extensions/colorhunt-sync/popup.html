@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 260px;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0e0e12;
+      color: #fff;
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      flex-shrink: 0;
+    }
+    .dot.inactive { background: #666; }
+    .title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+    .subtitle {
+      font-size: 10px;
+      color: #6B6A8A;
+      letter-spacing: 0.05em;
+    }
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      padding: 6px 0;
+      border-top: 1px solid rgba(140,171,255,0.15);
+    }
+    .stat-label { color: #6B6A8A; }
+    .stat-value { color: #8CABFF; font-family: monospace; }
+    .footer {
+      font-size: 9px;
+      color: #444;
+      margin-top: 10px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="dot" id="statusDot"></div>
+    <div>
+      <div class="title">PaintBrain Sync</div>
+      <div class="subtitle">COLORHUNT → SWATCH STUDIO</div>
+    </div>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Status</span>
+    <span class="stat-value" id="status">Active</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Palettes synced</span>
+    <span class="stat-value" id="count">—</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Last sync</span>
+    <span class="stat-value" id="lastSync">—</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">New last sync</span>
+    <span class="stat-value" id="lastImported">—</span>
+  </div>
+  <div class="footer">Syncs automatically when you browse ColorHunt</div>
+
+  <script>
+    chrome.storage.local.get(['lastSync', 'lastCount', 'lastImported', 'totalSynced'], data => {
+      if (data.lastSync) {
+        const ago = Math.round((Date.now() - new Date(data.lastSync).getTime()) / 60000)
+        document.getElementById('lastSync').textContent =
+          ago < 1 ? 'Just now' : ago < 60 ? `${ago}m ago` : `${Math.round(ago/60)}h ago`
+        document.getElementById('status').textContent = 'Active'
+        document.getElementById('statusDot').className = 'dot'
+      } else {
+        document.getElementById('status').textContent = 'Waiting…'
+        document.getElementById('statusDot').className = 'dot inactive'
+      }
+      document.getElementById('count').textContent = data.totalSynced || '—'
+      document.getElementById('lastImported').textContent =
+        data.lastImported != null ? `${data.lastImported} new` : '—'
+    })
+  </script>
+</body>
+</html>
