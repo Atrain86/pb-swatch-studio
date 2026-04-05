@@ -374,7 +374,7 @@ export default function SwatchStudio() {
       {/* Update banner */}
       <div className="fixed bottom-0 left-0 right-0 z-50 text-center py-1.5 text-[11px] font-bold text-white"
         style={{ background: 'var(--theme-accent)', color: '#000' }}>
-        v6.4 LIVE
+        v6.5 LIVE
       </div>
 
       {/* HexPopup — preserved for Scanned tab only */}
@@ -404,12 +404,12 @@ export default function SwatchStudio() {
       <div className="w-full max-w-2xl h-full rounded-2xl flex flex-col overflow-hidden"
         style={{ background: S.libraryBg, border: `2px solid ${S.accent}` }}>
 
-        {/* ═══ ZONE 1: Header — compact, logo left, title center ═══ */}
+        {/* ═══ ZONE 1: Header ═══ */}
         <header className="flex-shrink-0 flex items-center px-4 py-1.5 relative"
           style={{ background: S.headerBg, borderBottom: `1.5px solid ${S.divider}` }}>
-          <img src={logo} alt="PaintBrain" className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+          <img src={logo} alt="PaintBrain" className="w-[60px] h-[60px] rounded-xl object-cover flex-shrink-0"
             onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}/>
-          <div className="w-10 h-10 rounded-lg hidden items-center justify-center flex-shrink-0"
+          <div className="w-[60px] h-[60px] rounded-xl hidden items-center justify-center flex-shrink-0"
             style={{ background: 'linear-gradient(135deg,#471396,#EA2264,#EB5B00)' }}/>
           <div className="flex-1 flex flex-col items-center">
             <div className="text-base font-bold text-white tracking-[0.2em] leading-none">SWATCH</div>
@@ -445,69 +445,21 @@ export default function SwatchStudio() {
           })}
         </div>
 
-        {/* ═══ ZONE 2: Two-lane builder (Browse only) ═══ */}
+        {/* ═══ ZONE 2: Single compact builder (Browse only) ═══ */}
         {activeTab === 'browse' && (
-          <div className="flex-shrink-0 px-4 py-2 space-y-2"
+          <div className="flex-shrink-0 px-4 py-2"
             style={{ background: S.headerBg, borderBottom: `1.5px solid ${S.accent}` }}>
 
-            {/* ── Agent lane: seed color + generate + result ── */}
             <div className="rounded-lg p-2 space-y-1.5" style={{ border: `1px solid ${S.divider}` }}>
-              <div className="flex items-center gap-2">
-                <span className="text-[9px] uppercase tracking-widest text-white/50">Agent</span>
-                {selected ? (
-                  <>
-                    <div className="w-5 h-5 rounded" style={{ background: selected.hex, border: `1px solid ${S.divider}` }}/>
-                    <span className="text-[10px] font-mono text-white">{selected.hex}</span>
-                    <span className="text-[10px] text-white/60">{selected.name}</span>
-                  </>
-                ) : (
-                  <span className="text-[10px] text-white/40">Select a color below</span>
-                )}
-                <button onClick={() => { if (selected) { setSchemes(generateSchemes(selected.hex)); setSchemeTab(0) } }}
-                  disabled={!selected} className="btn-primary btn-sm ml-auto">Generate</button>
-              </div>
-
-              {schemes.length > 0 && (
-                <>
-                  <div className="flex gap-1 overflow-x-auto scrollbar-none">
-                    {schemes.map((s, i) => (
-                      <button key={s.name} onClick={() => setSchemeTab(i)}
-                        className="text-[9px] px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap text-white transition-colors"
-                        style={schemeTab === i
-                          ? { border: `1.5px solid ${S.accent}`, background: `color-mix(in srgb, ${S.accent} 12%, transparent)` }
-                          : { border: `1px solid ${S.divider}` }}>
-                        {s.name.replace(' Gradient','').replace(' Palette','')}</button>
-                    ))}
-                  </div>
-                  <div className="flex h-7 rounded-lg overflow-hidden" style={{ border: `1.5px solid ${S.divider}` }}>
-                    {schemes[schemeTab].colors.map((c, i) => (
-                      <div key={c.hex+i} style={{ background: c.hex }}
-                        className="flex-1 cursor-pointer hover:opacity-80" title={c.hex}/>
-                    ))}
-                  </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => { setShowSaveDialog(true); setSavingFrom('agent') }} className="btn-primary btn-sm">Save</button>
-                    <button onClick={() => setSchemes([])} className="btn-secondary btn-sm">Clear</button>
-                    <button onClick={() => copyPalette(schemes[schemeTab])} className="btn-secondary btn-sm">Copy</button>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* ── User lane: picked colors ── */}
-            <div className="rounded-lg p-2 space-y-1.5" style={{ border: `1px solid ${S.divider}` }}>
-              <div className="flex items-center gap-2">
-                <span className="text-[9px] uppercase tracking-widest text-white/50">Your picks</span>
-                {tray.length > 0 && <span className="text-[10px] text-white/40 ml-auto">{tray.length}</span>}
-              </div>
-              <div className="flex items-center gap-1.5 min-h-[48px] flex-wrap">
+              {/* Color chips + hex info */}
+              <div className="flex items-center gap-1.5 min-h-[44px] flex-wrap">
                 {tray.length === 0
-                  ? <span className="text-[10px] text-white/40">Tap colors below</span>
+                  ? <span className="text-[10px] text-white/40">Tap colors below to build</span>
                   : tray.map(c => (
                     <div key={c.hex} className="relative group"
                       onContextMenu={e => { e.preventDefault(); removeFromTray(c.hex) }}>
                       <div className="w-11 h-11 rounded-lg cursor-pointer hover:scale-105 transition-all"
-                        style={{ background: c.hex, border: inTray(c.hex) && selected?.hex === c.hex ? `2px solid ${S.accent}` : `1.5px solid ${S.divider}` }}
+                        style={{ background: c.hex, border: selected?.hex === c.hex ? `2px solid ${S.accent}` : `1.5px solid ${S.divider}` }}
                         onClick={() => setSelected(c)}/>
                       <button onClick={e => { e.stopPropagation(); removeFromTray(c.hex) }}
                         className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-black text-white text-[8px]
@@ -516,137 +468,182 @@ export default function SwatchStudio() {
                     </div>
                   ))
                 }
+                {selected && (
+                  <span className="text-[9px] font-mono text-white/60 ml-1">{selected.hex}</span>
+                )}
               </div>
-              <div className="flex gap-1">
-                <button onClick={() => { setSavingFrom('user'); setShowSaveDialog(true) }} disabled={!tray.length} className="btn-primary btn-sm">Save</button>
-                <button onClick={clearTray} className="btn-secondary btn-sm">Clear</button>
-                <button onClick={copyTrayHexes} className="btn-secondary btn-sm">Copy</button>
+
+              {/* Buttons row: Generate + Save + Clear + Copy */}
+              <div className="flex gap-1.5 items-center">
+                <button onClick={() => {
+                    if (tray.length > 0) {
+                      const seed = selected || tray[0]
+                      setSchemes(generateSchemes(seed.hex)); setSchemeTab(0)
+                    }
+                  }}
+                  disabled={!tray.length}
+                  className="text-[10px] px-3 py-1 rounded-full text-white transition-colors disabled:opacity-30"
+                  style={{ border: `1.5px solid ${S.accent}`, background: `color-mix(in srgb, ${S.accent} 12%, transparent)` }}>
+                  Generate</button>
+                <button onClick={() => { setSavingFrom('user'); setShowSaveDialog(true) }} disabled={!tray.length}
+                  className="text-[10px] px-3 py-1 rounded-full text-white transition-colors disabled:opacity-30"
+                  style={{ border: `1.5px solid ${S.accent}`, background: `color-mix(in srgb, ${S.accent} 12%, transparent)` }}>
+                  Save</button>
+                <button onClick={clearTray}
+                  className="text-[10px] px-3 py-1 rounded-full text-white transition-colors"
+                  style={{ border: `1px solid ${S.divider}` }}>Clear</button>
+                <button onClick={copyTrayHexes}
+                  className="text-[10px] px-3 py-1 rounded-full text-white transition-colors"
+                  style={{ border: `1px solid ${S.divider}` }}>Copy</button>
+                {tray.length > 0 && <span className="text-[9px] text-white/40 ml-auto">{tray.length}</span>}
               </div>
+
+              {/* Generated theme strip */}
+              {schemes.length > 0 && (
+                <div className="space-y-1">
+                  <div className="flex gap-1 overflow-x-auto scrollbar-none">
+                    {schemes.map((s, i) => (
+                      <button key={s.name} onClick={() => setSchemeTab(i)}
+                        className="text-[8px] px-1.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap text-white"
+                        style={schemeTab === i
+                          ? { border: `1px solid ${S.accent}`, background: `color-mix(in srgb, ${S.accent} 12%, transparent)` }
+                          : { border: `1px solid ${S.divider}` }}>
+                        {s.name.replace(' Gradient','').replace(' Palette','')}</button>
+                    ))}
+                  </div>
+                  <div className="flex h-7 rounded-lg overflow-hidden" style={{ border: `1.5px solid ${S.divider}` }}>
+                    {schemes[schemeTab].colors.map((c, i) => (
+                      <div key={c.hex+i} style={{ background: c.hex }}
+                        className="flex-1 cursor-pointer hover:opacity-80"
+                        onClick={() => addToTray(c)} title={c.hex}/>
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => { setSavingFrom('agent'); setShowSaveDialog(true) }}
+                      className="text-[10px] px-3 py-1 rounded-full text-white"
+                      style={{ border: `1.5px solid ${S.accent}`, background: `color-mix(in srgb, ${S.accent} 12%, transparent)` }}>
+                      Save generated</button>
+                    <button onClick={() => copyPalette(schemes[schemeTab])}
+                      className="text-[10px] px-3 py-1 rounded-full text-white"
+                      style={{ border: `1px solid ${S.divider}` }}>Copy</button>
+                    <button onClick={() => setSchemes([])}
+                      className="text-[10px] px-3 py-1 rounded-full text-white"
+                      style={{ border: `1px solid ${S.divider}` }}>Clear</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* ═══ ZONE 2b: Palettes — collapsible builder + filters ═══ */}
+        {/* ═══ ZONE 2b: Palettes — compact builder + filters ═══ */}
         {activeTab === 'palettes' && (
           <div className="flex-shrink-0 px-4 py-1.5 space-y-1.5"
             style={{ background: S.headerBg, borderBottom: `1.5px solid ${S.accent}` }}>
 
-            {/* Builder toggle */}
-            <button onClick={() => { setBuilderCollapsed(!builderCollapsed); if (builderCollapsed) setFiltersVisible(false) }}
-              className="flex items-center gap-2 w-full text-left py-1"
-              style={{ color: S.muted }}>
-              <svg className={`w-3 h-3 transition-transform ${builderCollapsed ? '' : 'rotate-90'}`}
-                fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path d="M9 18l6-6-6-6"/></svg>
-              <span className="text-[9px] uppercase tracking-widest">Builder</span>
-              {tray.length > 0 && (
-                <div className="flex gap-0.5 ml-1">
-                  {tray.slice(0, 6).map(c => <div key={c.hex} className="w-3 h-3 rounded-sm" style={{ background: c.hex }}/>)}
-                  {tray.length > 6 && <span className="text-[9px] text-white/40">+{tray.length - 6}</span>}
+            {/* Single compact builder */}
+            <div className="rounded-lg p-2 space-y-1.5" style={{ border: `1px solid ${S.divider}` }}>
+              <div className="flex items-center gap-1.5 min-h-[36px] flex-wrap">
+                {tray.length === 0
+                  ? <span className="text-[10px] text-white/40">Tap colors in palettes below</span>
+                  : tray.map(c => (
+                    <div key={c.hex} className="relative group"
+                      onContextMenu={e => { e.preventDefault(); removeFromTray(c.hex) }}>
+                      <div className="w-9 h-9 rounded-lg cursor-pointer hover:scale-105 transition-all"
+                        style={{ background: c.hex, border: selected?.hex === c.hex ? `2px solid ${S.accent}` : `1px solid ${S.divider}` }}
+                        onClick={() => setSelected(c)}/>
+                      <button onClick={e => { e.stopPropagation(); removeFromTray(c.hex) }}
+                        className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-black text-white text-[7px]
+                          hidden group-hover:flex items-center justify-center"
+                        style={{ border: `1px solid ${S.divider}` }}>×</button>
+                    </div>
+                  ))
+                }
+                {selected && <span className="text-[9px] font-mono text-white/60 ml-1">{selected.hex}</span>}
+              </div>
+              <div className="flex gap-1.5 items-center">
+                <button onClick={() => {
+                    if (tray.length > 0) {
+                      const seed = selected || tray[0]
+                      setSchemes(generateSchemes(seed.hex)); setSchemeTab(0)
+                    }
+                  }} disabled={!tray.length}
+                  className="text-[10px] px-3 py-1 rounded-full text-white disabled:opacity-30"
+                  style={{ border: `1.5px solid ${S.accent}`, background: `color-mix(in srgb, ${S.accent} 12%, transparent)` }}>Generate</button>
+                <button onClick={() => { setSavingFrom('user'); setShowSaveDialog(true) }} disabled={!tray.length}
+                  className="text-[10px] px-3 py-1 rounded-full text-white disabled:opacity-30"
+                  style={{ border: `1.5px solid ${S.accent}`, background: `color-mix(in srgb, ${S.accent} 12%, transparent)` }}>Save</button>
+                <button onClick={clearTray} className="text-[10px] px-3 py-1 rounded-full text-white" style={{ border: `1px solid ${S.divider}` }}>Clear</button>
+                <button onClick={copyTrayHexes} className="text-[10px] px-3 py-1 rounded-full text-white" style={{ border: `1px solid ${S.divider}` }}>Copy</button>
+              </div>
+              {schemes.length > 0 && (
+                <div className="space-y-1">
+                  <div className="flex gap-1 overflow-x-auto scrollbar-none">
+                    {schemes.map((s, i) => (
+                      <button key={s.name} onClick={() => setSchemeTab(i)}
+                        className="text-[8px] px-1.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap text-white"
+                        style={schemeTab === i
+                          ? { border: `1px solid ${S.accent}`, background: `color-mix(in srgb, ${S.accent} 12%, transparent)` }
+                          : { border: `1px solid ${S.divider}` }}>
+                        {s.name.replace(' Gradient','').replace(' Palette','')}</button>
+                    ))}
+                  </div>
+                  <div className="flex h-6 rounded-lg overflow-hidden" style={{ border: `1px solid ${S.divider}` }}>
+                    {schemes[schemeTab].colors.map((c, i) => (
+                      <div key={c.hex+i} style={{ background: c.hex }} className="flex-1 cursor-pointer hover:opacity-80"
+                        onClick={() => addToTray(c)} title={c.hex}/>
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button onClick={() => { setSavingFrom('agent'); setShowSaveDialog(true) }}
+                      className="text-[10px] px-3 py-1 rounded-full text-white"
+                      style={{ border: `1.5px solid ${S.accent}`, background: `color-mix(in srgb, ${S.accent} 12%, transparent)` }}>Save generated</button>
+                    <button onClick={() => copyPalette(schemes[schemeTab])}
+                      className="text-[10px] px-3 py-1 rounded-full text-white" style={{ border: `1px solid ${S.divider}` }}>Copy</button>
+                    <button onClick={() => setSchemes([])}
+                      className="text-[10px] px-3 py-1 rounded-full text-white" style={{ border: `1px solid ${S.divider}` }}>Clear</button>
+                  </div>
                 </div>
               )}
-              {selected && <span className="text-[9px] font-mono text-white/50 ml-auto">{selected.hex}</span>}
-            </button>
+            </div>
 
-            {!builderCollapsed && (
-              <div className="space-y-1.5">
-                {/* Agent lane — compact */}
-                <div className="rounded-lg p-2 space-y-1.5" style={{ border: `1px solid ${S.divider}` }}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] uppercase tracking-widest text-white/50">Agent</span>
-                    {selected && <>
-                      <div className="w-4 h-4 rounded" style={{ background: selected.hex, border: `1px solid ${S.divider}` }}/>
-                      <span className="text-[9px] font-mono text-white">{selected.hex}</span>
-                    </>}
-                    <button onClick={() => { if (selected) { setSchemes(generateSchemes(selected.hex)); setSchemeTab(0) } }}
-                      disabled={!selected} className="btn-primary btn-sm ml-auto">Generate</button>
-                  </div>
-                  {schemes.length > 0 && <>
-                    <div className="flex gap-1 overflow-x-auto scrollbar-none">
-                      {schemes.map((s, i) => (
-                        <button key={s.name} onClick={() => setSchemeTab(i)}
-                          className="text-[8px] px-1.5 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap text-white"
-                          style={schemeTab === i
-                            ? { border: `1px solid ${S.accent}`, background: `color-mix(in srgb, ${S.accent} 12%, transparent)` }
-                            : { border: `1px solid ${S.divider}` }}>
-                          {s.name.replace(' Gradient','').replace(' Palette','')}</button>
-                      ))}
-                    </div>
-                    <div className="flex h-6 rounded-lg overflow-hidden" style={{ border: `1px solid ${S.divider}` }}>
-                      {schemes[schemeTab].colors.map((c, i) => (
-                        <div key={c.hex+i} style={{ background: c.hex }} className="flex-1 cursor-pointer hover:opacity-80" title={c.hex}/>
-                      ))}
-                    </div>
-                    <div className="flex gap-1">
-                      <button onClick={() => { setSavingFrom('agent'); setShowSaveDialog(true) }} className="btn-primary btn-sm">Save</button>
-                      <button onClick={() => setSchemes([])} className="btn-secondary btn-sm">Clear</button>
-                      <button onClick={() => copyPalette(schemes[schemeTab])} className="btn-secondary btn-sm">Copy</button>
-                    </div>
-                  </>}
-                </div>
-
-                {/* User picks — compact */}
-                <div className="rounded-lg p-2 space-y-1.5" style={{ border: `1px solid ${S.divider}` }}>
-                  <div className="flex items-center gap-1.5 min-h-[36px] flex-wrap">
-                    {tray.length === 0
-                      ? <span className="text-[9px] text-white/40">Tap colors in palettes below</span>
-                      : tray.map(c => (
-                        <div key={c.hex} className="relative group">
-                          <div className="w-9 h-9 rounded-lg cursor-pointer hover:scale-105 transition-all"
-                            style={{ background: c.hex, border: selected?.hex === c.hex ? `2px solid ${S.accent}` : `1px solid ${S.divider}` }}
-                            onClick={() => setSelected(c)}/>
-                          <button onClick={e => { e.stopPropagation(); removeFromTray(c.hex) }}
-                            className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-black text-white text-[7px]
-                              hidden group-hover:flex items-center justify-center"
-                            style={{ border: `1px solid ${S.divider}` }}>×</button>
-                        </div>
-                      ))
-                    }
-                  </div>
-                  <div className="flex gap-1">
-                    <button onClick={() => { setSavingFrom('user'); setShowSaveDialog(true) }} disabled={!tray.length} className="btn-primary btn-sm">Save</button>
-                    <button onClick={clearTray} className="btn-secondary btn-sm">Clear</button>
-                    <button onClick={copyTrayHexes} className="btn-secondary btn-sm">Copy</button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Search — always visible */}
-            <div className="flex gap-2">
+            {/* Search */}
+            <div className="flex gap-1.5">
               <input value={searchQuery} onChange={e => handleSmartInputChange(e.target.value)}
                 onPaste={handleSmartInputPaste}
                 onKeyDown={e => { if (e.key === 'Enter') handleSmartInputSubmit() }}
-                placeholder="Search, or paste a ColorHunt URL..." className="input-field flex-1 !py-1.5 !text-[11px]"/>
-              <button onClick={handleSmartInputSubmit} disabled={searching} className="btn-primary btn-sm">
-                {searching ? <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin inline-block"/> : 'Search'}</button>
-              {searchResults && <button onClick={() => { setSearchResults(null); setSearchQuery('') }} className="btn-secondary btn-sm">Clear</button>}
+                placeholder="Search or paste URL..." className="input-field flex-1 !py-1 !text-[10px]"/>
+              <button onClick={handleSmartInputSubmit} disabled={searching}
+                className="text-[10px] px-3 py-1 rounded-full text-white disabled:opacity-30"
+                style={{ border: `1.5px solid ${S.accent}`, background: `color-mix(in srgb, ${S.accent} 12%, transparent)` }}>
+                {searching ? '...' : 'Search'}</button>
+              {searchResults && <button onClick={() => { setSearchResults(null); setSearchQuery('') }}
+                className="text-[10px] px-2 py-1 rounded-full text-white" style={{ border: `1px solid ${S.divider}` }}>×</button>}
             </div>
 
-            {/* Source filters — always visible */}
+            {/* Source + filters row */}
             <div className="flex gap-1 items-center">
               {[{ id: 'all', label: 'All' }, { id: 'colorhunt', label: 'ColorHunt' }, { id: 'custom', label: 'Custom' }, { id: 'generated', label: 'Generated' }].map(f => (
                 <button key={f.id} onClick={() => setPalFilter(f.id)}
-                  className="text-[10px] px-2.5 py-0.5 rounded-lg text-white transition-colors"
+                  className="text-[10px] px-2.5 py-0.5 rounded-full text-white"
                   style={palFilter === f.id
                     ? { border: `1.5px solid ${S.accent}`, background: `color-mix(in srgb, ${S.accent} 12%, transparent)` }
                     : { border: `1px solid ${S.divider}` }}>
                   {f.label}</button>
               ))}
-              {/* Filters toggle */}
               <button onClick={() => setFiltersVisible(!filtersVisible)}
-                className="text-[9px] px-2 py-0.5 rounded text-white/50 ml-auto"
+                className="text-[9px] px-2 py-0.5 rounded-full text-white ml-auto"
                 style={{ border: `1px solid ${S.divider}` }}>
-                {filtersVisible ? 'Hide filters' : 'Filters'}</button>
+                {filtersVisible ? '▲' : '▼'}</button>
             </div>
 
-            {/* Collapsible hue + tag filters */}
+            {/* Dropdown filters */}
             {filtersVisible && (
-              <div className="space-y-1.5 pb-1">
+              <div className="space-y-1 pb-0.5">
                 <div className="flex gap-1 overflow-x-auto scrollbar-none">
                   {SPECTRUM.map(s => (
                     <button key={s} onClick={() => setSpectrumFilter(spectrumFilter === s && s !== 'All' ? 'All' : s)}
-                      className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] flex-shrink-0 text-white whitespace-nowrap"
+                      className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[8px] flex-shrink-0 text-white whitespace-nowrap"
                       style={spectrumFilter === s
                         ? { border: `1px solid ${S.accent}`, background: `color-mix(in srgb, ${S.accent} 12%, transparent)` }
                         : { border: '1px solid transparent' }}>
@@ -656,7 +653,7 @@ export default function SwatchStudio() {
                 <div className="flex gap-1 flex-wrap">
                   {COLLECTION_TAGS.map(tag => (
                     <button key={tag} onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
-                      className="px-1.5 py-0.5 rounded-full text-[9px] text-white transition-colors"
+                      className="px-1.5 py-0.5 rounded-full text-[8px] text-white"
                       style={tagFilter === tag
                         ? { border: `1px solid ${S.accent}`, background: `color-mix(in srgb, ${S.accent} 12%, transparent)` }
                         : { border: `1px solid ${S.divider}` }}>
