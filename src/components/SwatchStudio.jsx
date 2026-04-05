@@ -371,6 +371,12 @@ export default function SwatchStudio() {
           style={{ border: `1.5px solid ${S.accent}` }}>{toast}</div>
       )}
 
+      {/* Update banner */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 text-center py-1 text-[9px] text-white/60"
+        style={{ background: S.headerBg, borderTop: `1px solid ${S.divider}` }}>
+        v6.3 · {new Date().toLocaleDateString('en-CA')}
+      </div>
+
       {/* HexPopup — preserved for Scanned tab only */}
       {activeTab === 'scanned' && hexPopup && (
         <HexPopup color={hexPopup} onClose={() => setHexPopup(null)}
