@@ -1,63 +1,43 @@
-// ─── ColorHunt Sync — client-side processing ────────────────
-// Processes palette codes from the Chrome extension.
-// In Phase B this moves server-side. For now it runs in the
-// browser via a simple fetch handler or direct import.
+// ─── ColorHunt Sync — fetches from backend ──────────────────
 
-import { computeDedupeHash } from './colorUtils'
 import * as db from './db'
 
+const BACKEND_URL = 'https://pb-swatch-studio.onrender.com'
 const SYNC_STATUS_KEY = 'pb_colorhunt_sync'
 
-// Process an array of ColorHunt palette codes
-// Each code is 24 hex chars = 4 colors × 6 chars
-export function processColorHuntCodes(codes) {
-  let imported = 0
-  let skipped = 0
+// Fetch synced palettes from backend and merge into local db
+export async function fetchAndMergeSyncedPalettes() {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/colorhunt/palettes`)
+    if (!res.ok) return null
 
-  for (const code of codes) {
-    // Validate: must be 24+ hex chars
-    const clean = code.replace(/[^a-fA-F0-9]/g, '')
-    if (clean.length < 24) { skipped++; continue }
+    const data = await res.json()
+    if (!data.palettes?.length) return data
 
-    // Parse 4 colors
-    const colors = []
-    for (let i = 0; i < 4; i++) {
-      const hex = '#' + clean.slice(i * 6, i * 6 + 6).toUpperCase()
-      colors.push({ hex, name: 'ColorHunt' })
+    let imported = 0
+    for (const p of data.palettes) {
+      const result = db.insertPalette({
+        name: p.name,
+        colors: p.colors,
+        source: 'colorhunt',
+        sourceSlug: p.sourceSlug,
+        categoryTags: p.categoryTags || ['colorhunt'],
+        autoNamed: p.autoNamed || false,
+      })
+      if (result) imported++
     }
 
-    // Check dedupe
-    const dedupeHash = computeDedupeHash(colors.map(c => c.hex))
-    const existing = db.getPalettes()
-    if (existing.some(p => p.dedupeHash === dedupeHash)) {
-      skipped++
-      continue
+    const status = {
+      lastSync: new Date().toISOString(),
+      total: data.count,
+      imported,
     }
-
-    // Insert
-    const result = db.insertPalette({
-      name: `ColorHunt ${clean.slice(0, 8)}`,
-      colors,
-      source: 'colorhunt',
-      sourceSlug: clean,
-      categoryTags: ['colorhunt', 'favorites'],
-      autoNamed: false,
-    })
-
-    if (result) imported++
-    else skipped++
+    try { localStorage.setItem(SYNC_STATUS_KEY, JSON.stringify(status)) } catch {}
+    return status
+  } catch (err) {
+    console.warn('[ColorHunt Sync] Fetch failed:', err.message)
+    return null
   }
-
-  // Update sync status
-  const status = {
-    lastSync: new Date().toISOString(),
-    imported,
-    skipped,
-    total: codes.length,
-  }
-  try { localStorage.setItem(SYNC_STATUS_KEY, JSON.stringify(status)) } catch {}
-
-  return status
 }
 
 // Get sync status for UI display

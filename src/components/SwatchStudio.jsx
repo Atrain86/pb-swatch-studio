@@ -8,7 +8,7 @@ import logo from '../assets/PB_LOGO_GRAPHFIX_1.png'
 import { hexToRgbString, formatCopy, parsePaletteURL, generateSchemes } from '../lib/colorUtils'
 import { SPECTRUM, SPECTRUM_COLORS, COLLECTION_TAGS, THEMES, COLOR_FAMILIES, ANTHROPIC_API, HAIKU_MODEL } from '../lib/constants'
 import * as db from '../lib/db'
-import { getSyncStatus } from '../lib/colorhuntSync'
+import { getSyncStatus, fetchAndMergeSyncedPalettes } from '../lib/colorhuntSync'
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -132,7 +132,11 @@ function PaletteCard({ palette, onLoad, onCopy, onShare, onDelete, onChipTap }) 
 
 export default function SwatchStudio() {
 
-  useEffect(() => { db.seedIfNeeded() }, [])
+  useEffect(() => {
+    db.seedIfNeeded()
+    // Fetch synced ColorHunt palettes from backend on load
+    fetchAndMergeSyncedPalettes().then(() => refreshPalettes())
+  }, [])
 
   const [themeIdx, setThemeIdx] = useState(0)
   const theme = THEMES[themeIdx]
