@@ -95,33 +95,40 @@ function SaveDialog({ tray, onSave, onAutoName, onClose }) {
 
 // ─── Palette card ────────────────────────────────────────────
 
-function PaletteCard({ palette, onLoad, onCopy, onShare, onDelete, onChipTap }) {
+function PaletteCard({ palette, onLoad, onCopy, onShare, onDelete, onChipTap, selectedHex }) {
+  const hasSelected = selectedHex && palette.colors.some(c => c.hex === selectedHex)
   return (
-    <div className="rounded-xl overflow-hidden transition-colors"
-      style={{ border: '1.5px solid var(--theme-divider)' }}>
-      <div className="flex h-12">
+    <div className="rounded-xl overflow-hidden transition-all"
+      style={{ border: hasSelected ? `2px solid ${selectedHex}` : '1.5px solid var(--theme-accent)' }}>
+      <div className="flex h-16">
         {palette.colors.map((c, i) => (
           <div key={c.hex + i} style={{ background: c.hex }}
             className="flex-1 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => onChipTap?.(c)} title={`${c.name} ${c.hex}`}/>
+            onClick={() => onChipTap?.(c)}
+            onContextMenu={e => { e.preventDefault(); navigator.clipboard.writeText(c.hex).catch(() => {}) }}
+            title={`${c.name} ${c.hex} · hold to copy`}/>
         ))}
       </div>
-      <div className="px-3 py-2" style={{ borderTop: '1px solid var(--theme-divider)' }}>
-        <div className="mb-1.5">
-          <div className="text-sm font-medium text-white">{palette.name}</div>
-          <div className="flex gap-2 text-[10px] text-white/70">
-            {palette.categoryTags?.slice(0, 2).map(t => <span key={t}>{t}</span>)}
-            {palette.source && palette.source !== 'curated' && (
-              <span className="px-1.5 py-0.5 rounded text-white/60" style={{ border: '1px solid var(--theme-divider)' }}>{palette.source}</span>
-            )}
-            {palette.addedAt && <span>· {new Date(palette.addedAt).toLocaleDateString('en-CA')}</span>}
+      <div className="flex items-center gap-2 px-3 py-1.5" style={{ borderTop: '1px solid var(--theme-accent)' }}>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-white truncate">{palette.name}</div>
+          <div className="text-[9px] text-white/50">
+            {palette.source && palette.source !== 'curated' ? palette.source : 'curated'}
           </div>
         </div>
-        <div className="flex gap-1.5 flex-wrap">
-          {onLoad && <button onClick={() => onLoad(palette)} className="btn-primary btn-sm">Load</button>}
-          <button onClick={() => onCopy(palette)} className="btn-secondary btn-sm">Copy hex</button>
-          {onShare && <button onClick={() => onShare(palette)} className="btn-secondary btn-sm">Share</button>}
-          {onDelete && <button onClick={() => onDelete(palette.id)} className="btn-secondary btn-sm ml-auto">Delete</button>}
+        <div className="flex gap-1.5 flex-shrink-0">
+          {onLoad && <button onClick={() => onLoad(palette)}
+            className="text-[9px] px-2 py-0.5 rounded-full text-white"
+            style={{ border: '1.5px solid var(--theme-accent)', background: 'transparent' }}>Load</button>}
+          <button onClick={() => onCopy(palette)}
+            className="text-[9px] px-2 py-0.5 rounded-full text-white"
+            style={{ border: '1.5px solid var(--theme-accent)', background: 'transparent' }}>Copy</button>
+          {onShare && <button onClick={() => onShare(palette)}
+            className="text-[9px] px-2 py-0.5 rounded-full text-white"
+            style={{ border: '1.5px solid var(--theme-accent)', background: 'transparent' }}>Share</button>}
+          {onDelete && <button onClick={() => onDelete(palette.id)}
+            className="text-[9px] px-2 py-0.5 rounded-full text-white"
+            style={{ border: '1.5px solid var(--theme-accent)', background: 'transparent' }}>Del</button>}
         </div>
       </div>
     </div>
@@ -384,7 +391,7 @@ export default function SwatchStudio() {
       {/* Update banner */}
       <div className="fixed bottom-0 left-0 right-0 z-50 text-center py-1.5 text-[11px] font-bold text-white"
         style={{ background: 'var(--theme-accent)', color: '#000' }}>
-        v6.7 LIVE
+        v6.8 LIVE
       </div>
 
       {/* HexPopup — preserved for Scanned tab only */}
@@ -475,7 +482,6 @@ export default function SwatchStudio() {
                   </div>
                 ))
               }
-              {selected && <span className="text-[9px] font-mono text-white/60 ml-1">{selected.hex}</span>}
             </div>
 
             {/* Buttons */}
@@ -551,7 +557,6 @@ export default function SwatchStudio() {
                   </div>
                 ))
               }
-              {selected && <span className="text-[9px] font-mono text-white/60 ml-1">{selected.hex}</span>}
             </div>
 
             <div className="flex gap-2 items-center">
@@ -604,17 +609,18 @@ export default function SwatchStudio() {
                 <span className="text-[9px] text-white/40 w-8 text-right">{zoomCols}col</span>
               </div>
 
-              <div className="grid gap-0" style={{ gridTemplateColumns: `repeat(${zoomCols}, 1fr)` }}>
+              <div className="grid" style={{ gridTemplateColumns: `repeat(${zoomCols}, 1fr)`, gap: '1px', background: '#000' }}>
                 {COLOR_FAMILIES.flatMap(fam => fam.colors).map((c, i) => (
                   <div key={c.hex + i} onClick={() => addToTray(c)}
+                    onContextMenu={e => { e.preventDefault(); navigator.clipboard.writeText(c.hex).catch(() => {}); notify('Copied ' + c.hex) }}
                     style={{
                       background: c.hex,
                       outline: inTray(c.hex) ? `2px solid ${S.accent}` : 'none',
-                      outlineOffset: inTray(c.hex) ? '-2px' : '0',
+                      outlineOffset: '-2px',
                       zIndex: inTray(c.hex) ? 10 : 0,
                     }}
                     className="aspect-square cursor-pointer transition-transform hover:scale-110 hover:z-20"
-                    title={`${c.name} ${c.hex}`}/>
+                    title={`${c.name} ${c.hex} · hold to copy`}/>
                 ))}
               </div>
             </div>
@@ -669,7 +675,8 @@ export default function SwatchStudio() {
                       <PaletteCard key={p.id || p.name + i} palette={p}
                         onLoad={loadPalette} onCopy={copyPalette} onShare={sharePalette}
                         onDelete={p.source !== 'curated' ? handleDeletePalette : undefined}
-                        onChipTap={c => { addToTray(c); setSelected(c) }}/>
+                        onChipTap={c => { addToTray(c); setSelected(c) }}
+                      selectedHex={selected?.hex}/>
                     ))}
                   </div>
                 )}
