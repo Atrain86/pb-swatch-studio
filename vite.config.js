@@ -9,6 +9,22 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        // Don't precache — use network-first for everything
+        globPatterns: [],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/pb-swatch-studio\.netlify\.app\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'app-cache',
+              expiration: { maxAgeSeconds: 60 * 60 }, // 1 hour max
+            },
+          },
+        ],
+      },
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'PaintBrain Swatch Studio',
