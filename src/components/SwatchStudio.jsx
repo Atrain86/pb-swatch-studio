@@ -9,6 +9,7 @@ import { hexToRgbString, formatCopy, parsePaletteURL, generateSchemes } from '..
 import { SPECTRUM, SPECTRUM_COLORS, COLLECTION_TAGS, THEMES, COLOR_FAMILIES, ANTHROPIC_API, HAIKU_MODEL } from '../lib/constants'
 import * as db from '../lib/db'
 import { getSyncStatus, fetchAndMergeSyncedPalettes } from '../lib/colorhuntSync'
+import { ntcName } from '../lib/ntc'
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -19,10 +20,42 @@ function fileToBase64(file) {
   })
 }
 
+// Preprocess scanned images: resize → blur → compress
+function preprocessImage(imgElement, mode = 'quick') {
+  const maxSize = mode === 'precise' ? 800 : 300
+  const blurRadius = mode === 'precise' ? 2 : 6
+  const quality = mode === 'precise' ? 0.95 : 0.85
+
+  // Step 1: resize
+  let { width, height } = imgElement
+  if (width > maxSize || height > maxSize) {
+    const scale = maxSize / Math.max(width, height)
+    width = Math.round(width * scale)
+    height = Math.round(height * scale)
+  }
+  const c1 = document.createElement('canvas')
+  c1.width = width; c1.height = height
+  const ctx1 = c1.getContext('2d')
+  ctx1.drawImage(imgElement, 0, 0, width, height)
+
+  // Step 2: blur
+  const c2 = document.createElement('canvas')
+  c2.width = width; c2.height = height
+  const ctx2 = c2.getContext('2d')
+  ctx2.filter = `blur(${blurRadius}px)`
+  ctx2.drawImage(c1, 0, 0)
+
+  // Step 3: export as compressed JPEG
+  const base64 = c2.toDataURL('image/jpeg', quality).split(',')[1]
+  const processedKB = Math.round((base64.length * 3) / 4 / 1024)
+  return { base64, processedKB }
+}
+
 // ─── Hex popup ───────────────────────────────────────────────
 
 function HexPopup({ color, onClose, onPick, onCopy }) {
   if (!color) return null
+  const colorDisplayName = color.name && color.name !== color.hex ? color.name : ntcName(color.hex)[1]
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
       <div className="rounded-xl p-4 w-64 space-y-3"
@@ -33,7 +66,7 @@ function HexPopup({ color, onClose, onPick, onCopy }) {
           <div>
             <div className="text-base font-mono text-white">{color.hex}</div>
             <div className="text-xs text-white/70">rgb({hexToRgbString(color.hex)})</div>
-            {color.name && <div className="text-[10px] text-white/50">{color.name}</div>}
+            <div className="text-[10px] text-white/50">{colorDisplayName}</div>
           </div>
         </div>
         <div className="flex gap-2">
@@ -324,13 +357,21 @@ export default function SwatchStudio() {
     await new Promise(resolve => { reader.onload = ev => { dataUrl = ev.target.result; setScanImage(dataUrl); resolve() }; reader.readAsDataURL(file) })
     setScanColors([]); setScanWarning(null); setScanSchemes([]); setScanning(true)
     try {
-      const base64 = await fileToBase64(file)
+      // Preprocess: load image element, then resize+blur+compress
+      const img = await new Promise((resolve, reject) => {
+        const el = new Image()
+        el.onload = () => resolve(el)
+        el.onerror = reject
+        el.src = dataUrl
+      })
+      const { base64 } = preprocessImage(img, 'quick')
+
       const res = await fetch(ANTHROPIC_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
         body: JSON.stringify({ model: HAIKU_MODEL, max_tokens: 600,
           system: 'Extract 3-6 dominant colors. Return ONLY JSON: [{"hex":"#RRGGBB","name":"name","coverage":"dominant|accent|subtle"}]',
-          messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: file.type || 'image/jpeg', data: base64 } }, { type: 'text', text: 'Extract colors.' }] }] }),
+          messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } }, { type: 'text', text: 'Extract colors.' }] }] }),
       })
       const data = await res.json()
       const colors = JSON.parse((data.content?.[0]?.text || '').replace(/```json|```/g, '').trim())
@@ -728,12 +769,15 @@ export default function SwatchStudio() {
                     <div className="flex-1 space-y-2">
                       <div className="text-xs text-white">{scanColors.length} colors detected</div>
                       <div className="flex flex-wrap gap-1.5">
-                        {scanColors.map((c, i) => (
-                          <div key={c.hex+i} className="flex items-center gap-1 cursor-pointer" onClick={() => handleChipTap(c)}>
-                            <div className="w-8 h-8 rounded" style={{ background: c.hex, border: `1.5px solid ${S.divider}` }}/>
-                            <span className="text-[9px] font-mono text-white/60">{c.hex}</span>
-                          </div>
-                        ))}
+                        {scanColors.map((c, i) => {
+                          const displayName = c.name && c.name !== c.hex ? c.name : ntcName(c.hex)[1]
+                          return (
+                            <div key={c.hex+i} className="flex items-center gap-1 cursor-pointer" onClick={() => handleChipTap({ ...c, name: displayName })}>
+                              <div className="w-8 h-8 rounded" style={{ background: c.hex, border: `1.5px solid ${S.divider}` }}/>
+                              <span className="text-[9px] text-white/60">{displayName}</span>
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
                   </div>

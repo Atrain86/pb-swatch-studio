@@ -1,5 +1,7 @@
 // ─── Color math utilities ────────────────────────────────────
 
+import { generateSchemesLAB } from './colorMath'
+
 export function hexToRgb(hex) {
   const r = parseInt(hex.slice(1, 3), 16)
   const g = parseInt(hex.slice(3, 5), 16)
@@ -70,67 +72,11 @@ export function hslToHex(h, s, l) {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase()
 }
 
-// ─── Color scheme generation (pure client-side HSL math) ─────
+// ─── Color scheme generation (LAB color space) ──────────────
+// Delegates to colorMath.js for perceptually uniform results
 
 export function generateSchemes(hex) {
-  const { h, s, l } = hexToHsl(hex)
-
-  // 1. Generic Gradient — 6 steps, hue shifts +15°/step, saturation decreases slightly
-  const genericGradient = {
-    name: 'Generic Gradient',
-    source: 'ColorSpace',
-    categoryTags: ['gradient'],
-    colors: Array.from({ length: 6 }, (_, i) => {
-      const newH = h + i * 15
-      const newS = Math.max(10, s - i * 4)
-      const newL = Math.min(90, Math.max(10, l + (i - 2) * 6))
-      const hex = hslToHex(newH, newS, newL)
-      return { hex, name: `Step ${i + 1}` }
-    }),
-  }
-
-  // 2. Matching Gradient — 6 steps from seed to complementary (h+180)
-  const matchingGradient = {
-    name: 'Matching Gradient',
-    source: 'ColorSpace',
-    categoryTags: ['gradient', 'complementary'],
-    colors: Array.from({ length: 6 }, (_, i) => {
-      const t = i / 5
-      const newH = h + t * 180
-      const newS = s + (t < 0.5 ? -t * 10 : (t - 0.5) * 10)
-      const newL = l + Math.sin(t * Math.PI) * 12
-      const hex = hslToHex(newH, Math.max(15, newS), Math.max(15, Math.min(85, newL)))
-      return { hex, name: `Step ${i + 1}` }
-    }),
-  }
-
-  // 3. Spot Palette — seed + 30% lighter + 60% lighter + complementary accent
-  const spotPalette = {
-    name: 'Spot Palette',
-    source: 'ColorSpace',
-    categoryTags: ['spot'],
-    colors: [
-      { hex, name: 'Seed' },
-      { hex: hslToHex(h, Math.max(15, s - 10), Math.min(90, l + 20)), name: 'Light tint' },
-      { hex: hslToHex(h, Math.max(10, s - 20), Math.min(95, l + 40)), name: 'Pale tint' },
-      { hex: hslToHex(h + 150, Math.min(100, s + 15), Math.max(25, Math.min(60, l))), name: 'Accent' },
-    ],
-  }
-
-  // 4. Twisted Spot — seed + split-complementary pair + desaturated neutral
-  const twistedSpot = {
-    name: 'Twisted Spot',
-    source: 'ColorSpace',
-    categoryTags: ['split-complementary'],
-    colors: [
-      { hex, name: 'Seed' },
-      { hex: hslToHex(h + 120, Math.min(90, s), Math.max(25, Math.min(70, l))), name: 'Triad A' },
-      { hex: hslToHex(h + 240, Math.min(90, s), Math.max(25, Math.min(70, l))), name: 'Triad B' },
-      { hex: hslToHex(h, Math.max(5, s * 0.2), Math.min(80, l + 15)), name: 'Neutral' },
-    ],
-  }
-
-  return [genericGradient, matchingGradient, spotPalette, twistedSpot]
+  return generateSchemesLAB(hex)
 }
 
 // Dedupe hash: sort hex values alphabetically, join with dashes

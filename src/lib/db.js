@@ -4,6 +4,7 @@
 
 import { hexToHueFamily, hexToHueAngle, hexToLightness, computeDedupeHash, palettePrimaryHue } from './colorUtils'
 import { CURATED_PALETTES } from './constants'
+import { ntcName } from './ntc'
 
 const COLORS_KEY  = 'pb_colors'
 const PALETTES_KEY = 'pb_palettes'
@@ -38,16 +39,33 @@ export function getColorByHex(hex) {
   return colors.find(c => c.hex.toUpperCase() === hex.toUpperCase()) || null
 }
 
+// Check if a color name is generic (just a hex code, placeholder, or source tag)
+function isGenericName(name, hex) {
+  if (!name) return true
+  const n = name.trim().toUpperCase()
+  const h = hex.toUpperCase()
+  if (n === h || n === h.slice(1)) return true
+  if (['COLORHUNT', 'COOLORS', 'SCANNED', 'CUSTOM', 'STEP 1', 'STEP 2', 'STEP 3', 'STEP 4', 'STEP 5', 'STEP 6', 'SEED', 'LIGHT TINT', 'PALE TINT', 'COMPLEMENT', 'SPLIT A', 'SPLIT B', 'NEUTRAL', 'TRIAD A', 'TRIAD B', 'ACCENT'].includes(n)) return true
+  return false
+}
+
 export function upsertColor({ hex, name, source = 'custom' }) {
   const colors = load(COLORS_KEY)
   const normalized = hex.toUpperCase()
   const existing = colors.find(c => c.hex === normalized)
   if (existing) return existing
 
+  // Use ntc.js to get a real color name when none is provided or name is generic
+  let colorName = name
+  if (isGenericName(name, normalized)) {
+    const [, ntcColorName] = ntcName(normalized)
+    colorName = ntcColorName
+  }
+
   const color = {
     id: crypto.randomUUID(),
     hex: normalized,
-    name: name || normalized,
+    name: colorName,
     hueFamily: hexToHueFamily(normalized),
     hueAngle: hexToHueAngle(normalized),
     lightness: hexToLightness(normalized),
@@ -114,10 +132,20 @@ export function insertPalette({ name, colors, categoryTags = [], source = 'custo
   // Upsert individual colors
   upsertColors(colors, source === 'custom' || source === 'user' ? 'custom' : source)
 
+  // Enrich individual color names via ntc.js
+  const enrichedColors = colors.map(c => {
+    const hex = c.hex.toUpperCase()
+    if (isGenericName(c.name, hex)) {
+      const [, ntcColorName] = ntcName(hex)
+      return { hex, name: ntcColorName }
+    }
+    return { hex, name: c.name || hex }
+  })
+
   const palette = {
     id: crypto.randomUUID(),
     name: name || `Palette ${palettes.length + 1}`,
-    colors: colors.map(c => ({ hex: c.hex.toUpperCase(), name: c.name || c.hex })),
+    colors: enrichedColors,
     colorsCache: colors.map(c => c.hex.toUpperCase()),
     categoryTags,
     source,
