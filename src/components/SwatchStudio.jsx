@@ -189,16 +189,11 @@ export default function SwatchStudio() {
   const [builderCollapsed, setBuilderCollapsed] = useState(false)
   const [filtersVisible, setFiltersVisible] = useState(false)
 
-  // Zoom: 0-100 slider, maps to grid columns
-  const [zoom, setZoom] = useState(() => {
-    try { return parseInt(localStorage.getItem('pb_zoom') || '30') } catch { return 30 }
+  // Zoom: slider value = number of columns directly (3-16)
+  const [zoomCols, setZoomCols] = useState(() => {
+    try { return parseInt(localStorage.getItem('pb_zoom_cols') || '10') } catch { return 10 }
   })
-  useEffect(() => { localStorage.setItem('pb_zoom', String(zoom)) }, [zoom])
-
-  // Map zoom 0-100 to columns: 0=16cols, 100=3cols
-  const zoomCols = Math.max(3, Math.round(16 - (zoom / 100) * 13))
-  const zoomSize = zoom < 20 ? 'min-h-[24px]' : zoom < 50 ? 'min-h-[36px]' : zoom < 75 ? 'min-h-[48px]' : 'min-h-[72px]'
-  const showHex = zoom >= 50
+  useEffect(() => { localStorage.setItem('pb_zoom_cols', String(zoomCols)) }, [zoomCols])
 
   const fileRef = useRef(null)
   const cameraRef = useRef(null)
@@ -391,7 +386,7 @@ export default function SwatchStudio() {
       {/* Update banner */}
       <div className="fixed bottom-0 left-0 right-0 z-50 text-center py-1.5 text-[11px] font-bold text-white"
         style={{ background: 'var(--theme-accent)', color: '#000' }}>
-        v6.8 LIVE
+        v6.9 LIVE
       </div>
 
       {/* HexPopup — preserved for Scanned tab only */}
@@ -465,34 +460,38 @@ export default function SwatchStudio() {
           <div className="flex-shrink-0 px-4 py-2 space-y-1.5"
             style={{ background: S.headerBg, borderBottom: `2px solid ${S.accent}` }}>
 
-            {/* Color chips + hex */}
-            <div className="flex items-center gap-1.5 min-h-[44px] flex-wrap">
-              {tray.length === 0
-                ? <span className="text-[10px] text-white/50">Tap colors below to build</span>
-                : tray.map(c => (
-                  <div key={c.hex} className="relative group"
-                    onContextMenu={e => { e.preventDefault(); removeFromTray(c.hex) }}>
-                    <div className="w-11 h-11 rounded-lg cursor-pointer hover:scale-105 transition-all"
-                      style={{ background: c.hex, border: selected?.hex === c.hex ? `2px solid ${S.accent}` : `1.5px solid ${S.divider}` }}
-                      onClick={() => setSelected(c)}/>
-                    <button onClick={e => { e.stopPropagation(); removeFromTray(c.hex) }}
-                      className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-black text-white text-[8px]
-                        hidden group-hover:flex items-center justify-center"
-                      style={{ border: `1px solid ${S.accent}` }}>×</button>
-                  </div>
-                ))
-              }
-            </div>
+            {/* Palette chips — tight fitted container, double-tap to remove */}
+            {tray.length > 0 ? (
+              <div className="flex rounded-lg overflow-hidden" style={{ border: `1.5px solid ${S.accent}` }}>
+                {tray.map(c => {
+                  const lastTapRef = { current: 0 }
+                  return (
+                    <div key={c.hex}
+                      onClick={() => {
+                        const now = Date.now()
+                        if (now - (c._lastTap || 0) < 350) { removeFromTray(c.hex); return }
+                        c._lastTap = now
+                        setSelected(c)
+                      }}
+                      onContextMenu={e => { e.preventDefault(); removeFromTray(c.hex); notify('Removed') }}
+                      style={{ background: c.hex, outline: selected?.hex === c.hex ? `2px solid #fff` : 'none', outlineOffset: '-2px' }}
+                      className="flex-1 h-11 cursor-pointer hover:opacity-80 transition-opacity"
+                      title={`${c.hex} · double-tap to remove`}/>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-[10px] text-white/40 py-2">Tap colors below to build</div>
+            )}
 
-            {/* Buttons */}
-            <div className="flex gap-2 items-center">
+            {/* Buttons — separated */}
+            <div className="flex gap-2 items-center pt-1">
               <button onClick={() => { if (tray.length) { setSchemes(generateSchemes((selected || tray[0]).hex)); setSchemeTab(0) } }}
                 disabled={!tray.length} {...btn(false)} className={btn().className + ' disabled:opacity-30'}>Generate</button>
               <button onClick={() => { setSavingFrom('user'); setShowSaveDialog(true) }} disabled={!tray.length}
                 {...btn(false)} className={btn().className + ' disabled:opacity-30'}>Save</button>
               <button onClick={clearTray} {...btn(false)}>Clear</button>
               <button onClick={copyTrayHexes} {...btn(false)}>Copy</button>
-              {tray.length > 0 && <span className="text-[9px] text-white/40 ml-auto">{tray.length}</span>}
             </div>
 
             {/* Generated themes */}
@@ -541,25 +540,27 @@ export default function SwatchStudio() {
             <div style={{ borderTop: `1px solid ${S.divider}` }}/>
 
             {/* Builder */}
-            <div className="flex items-center gap-1.5 min-h-[36px] flex-wrap">
-              {tray.length === 0
-                ? <span className="text-[10px] text-white/50">Tap colors in palettes below</span>
-                : tray.map(c => (
-                  <div key={c.hex} className="relative group"
-                    onContextMenu={e => { e.preventDefault(); removeFromTray(c.hex) }}>
-                    <div className="w-9 h-9 rounded-lg cursor-pointer hover:scale-105 transition-all"
-                      style={{ background: c.hex, border: selected?.hex === c.hex ? `2px solid ${S.accent}` : `1.5px solid ${S.divider}` }}
-                      onClick={() => setSelected(c)}/>
-                    <button onClick={e => { e.stopPropagation(); removeFromTray(c.hex) }}
-                      className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-black text-white text-[7px]
-                        hidden group-hover:flex items-center justify-center"
-                      style={{ border: `1px solid ${S.accent}` }}>×</button>
-                  </div>
-                ))
-              }
-            </div>
+            {tray.length > 0 ? (
+              <div className="flex rounded-lg overflow-hidden" style={{ border: `1.5px solid ${S.accent}` }}>
+                {tray.map(c => (
+                  <div key={c.hex}
+                    onClick={() => {
+                      const now = Date.now()
+                      if (now - (c._lastTap || 0) < 350) { removeFromTray(c.hex); return }
+                      c._lastTap = now
+                      setSelected(c)
+                    }}
+                    onContextMenu={e => { e.preventDefault(); removeFromTray(c.hex); notify('Removed') }}
+                    style={{ background: c.hex, outline: selected?.hex === c.hex ? '2px solid #fff' : 'none', outlineOffset: '-2px' }}
+                    className="flex-1 h-9 cursor-pointer hover:opacity-80 transition-opacity"
+                    title={`${c.hex} · double-tap to remove`}/>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[10px] text-white/40 py-1">Tap colors in palettes below</div>
+            )}
 
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-2 items-center pt-1">
               <button onClick={() => { if (tray.length) { setSchemes(generateSchemes((selected || tray[0]).hex)); setSchemeTab(0) } }}
                 disabled={!tray.length} {...btn(false)} className={btn().className + ' disabled:opacity-30'}>Generate</button>
               <button onClick={() => { setSavingFrom('user'); setShowSaveDialog(true) }} disabled={!tray.length}
@@ -599,29 +600,31 @@ export default function SwatchStudio() {
           {/* ══════════ BROWSE — Color library ══════════ */}
           {activeTab === 'browse' && (
             <div className="space-y-2">
-              {/* Zoom slider */}
+              {/* Zoom slider — left=small(more cols), right=big(fewer cols) */}
               <div className="flex items-center gap-3 mb-1">
-                <span className="text-[9px] uppercase tracking-widest text-white/50">Color library</span>
-                <input type="range" min="0" max="100" value={zoom}
-                  onChange={e => setZoom(parseInt(e.target.value))}
-                  className="flex-1 h-1 accent-[var(--theme-accent)] cursor-pointer"
+                <span className="text-[8px] text-white/30">sm</span>
+                <input type="range" min="3" max="16" value={17 - zoomCols}
+                  onChange={e => setZoomCols(17 - parseInt(e.target.value))}
+                  className="flex-1 h-1 cursor-pointer"
                   style={{ accentColor: S.accent }}/>
-                <span className="text-[9px] text-white/40 w-8 text-right">{zoomCols}col</span>
+                <span className="text-[8px] text-white/30">lg</span>
               </div>
 
-              <div className="grid" style={{ gridTemplateColumns: `repeat(${zoomCols}, 1fr)`, gap: '1px', background: '#000' }}>
-                {COLOR_FAMILIES.flatMap(fam => fam.colors).map((c, i) => (
-                  <div key={c.hex + i} onClick={() => addToTray(c)}
-                    onContextMenu={e => { e.preventDefault(); navigator.clipboard.writeText(c.hex).catch(() => {}); notify('Copied ' + c.hex) }}
-                    style={{
-                      background: c.hex,
-                      outline: inTray(c.hex) ? `2px solid ${S.accent}` : 'none',
-                      outlineOffset: '-2px',
-                      zIndex: inTray(c.hex) ? 10 : 0,
-                    }}
-                    className="aspect-square cursor-pointer transition-transform hover:scale-110 hover:z-20"
-                    title={`${c.name} ${c.hex} · hold to copy`}/>
-                ))}
+              <div className="w-full overflow-hidden rounded-lg" style={{ background: '#111' }}>
+                <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${zoomCols}, 1fr)`, gap: '1px' }}>
+                  {COLOR_FAMILIES.flatMap(fam => fam.colors).map((c, i) => (
+                    <div key={c.hex + i} onClick={() => addToTray(c)}
+                      onContextMenu={e => { e.preventDefault(); navigator.clipboard.writeText(c.hex).catch(() => {}); notify('Copied ' + c.hex) }}
+                      style={{
+                        background: c.hex,
+                        outline: inTray(c.hex) ? `2px solid ${S.accent}` : 'none',
+                        outlineOffset: '-2px',
+                        zIndex: inTray(c.hex) ? 10 : 0,
+                      }}
+                      className="aspect-square cursor-pointer hover:opacity-80 transition-opacity"
+                      title={`${c.name} ${c.hex} · hold to copy`}/>
+                  ))}
+                </div>
               </div>
             </div>
           )}
