@@ -177,3 +177,29 @@ export function findNearDuplicates(palettes, threshold = 8) {
   }
   return [...toRemove]
 }
+
+// ─── Theme from palette (stub — not exposed in UI yet) ──────
+// Takes a palette hex array and assigns colors to theme CSS
+// variable roles by LAB analysis. Will be exposed in Sprint 2.
+export function applyPaletteAsTheme(hexArray) {
+  if (!hexArray || hexArray.length < 2) return null
+  // Sort by lightness (L channel)
+  const analyzed = hexArray.map(hex => {
+    const h = (typeof hex === 'string') ? hex : hex.hex
+    const [L, A, B] = rgbToLab(h)
+    return { hex: h, L, A, B, chroma: Math.sqrt(A * A + B * B) }
+  }).sort((a, b) => a.L - b.L)
+  // Most chromatic color = accent
+  const accent = [...analyzed].sort((a, b) => b.chroma - a.chroma)[0]
+  // Darkest = header background, second darkest = card bg
+  const darkest = analyzed[0]
+  const secondDark = analyzed[Math.min(1, analyzed.length - 1)]
+  return {
+    '--ac': accent.hex,
+    '--hdr': darkest.hex,
+    '--card': secondDark.hex,
+    '--bg': labToHex(Math.max(3, darkest.L - 4), darkest.A * 0.5, darkest.B * 0.5),
+    '--bdr': accent.hex + '2e',
+    '--ac2': accent.hex + '1a',
+  }
+}
