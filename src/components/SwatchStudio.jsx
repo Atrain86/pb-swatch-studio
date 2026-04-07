@@ -227,19 +227,30 @@ export default function SwatchStudio() {
           </div>
         </div>
 
-        <div className="picks-bar">
+        {/* Picks grid — same size as library chips, 5 wide */}
+        <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--div)' }}>
           {dPicks.length === 0 ? (
-            <span className="ph">Tap to pick · tap again to remove</span>
+            <div style={{ padding: '6px 4px', fontSize: 10, color: 'var(--t2)' }}>Tap to pick · tap again to remove</div>
           ) : (
-            dPicks.map(hex => (
-              <div key={hex} className="pc" style={{ background: hex }} title={hex}
-                onClick={() => togglePick(hex)} />
-            ))
-          )}
-          {dPicks.length > 0 && (
-            <button className="stp-icon" onClick={sendPicksToQueue} title="Send to queue">↓</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="cgrid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', flex: 1 }}>
+                {dPicks.map(hex => (
+                  <div key={hex} className="chip" style={{ background: hex }}
+                    onClick={() => togglePick(hex)}>
+                    <div className="chex">{hex}</div>
+                  </div>
+                ))}
+              </div>
+              <button className="stp-icon" onClick={sendPicksToQueue} title="Send to Browse"
+                style={{ whiteSpace: 'nowrap', width: 'auto', padding: '0 10px', fontSize: 12, fontWeight: 600, gap: 4 }}>
+                → Browse
+              </button>
+            </div>
           )}
         </div>
+
+        {/* Divider */}
+        <div style={{ height: 3, background: 'var(--div2)', flexShrink: 0 }} />
 
         <div className="grid-wrap">
           <div className="cgrid" style={{ gridTemplateColumns: `repeat(${dZoom}, 1fr)` }}>
