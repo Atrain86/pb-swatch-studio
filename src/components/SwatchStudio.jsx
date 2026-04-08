@@ -6,6 +6,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import logo from '../assets/PB_LOGO_GRAPHFIX_1.png'
+import { ArrowUpToLine, Copy, Share2, Trash2 } from 'lucide-react'
 
 // ─── LAB color math ──────────────────────────────────────────
 function l2h(L, A, B) {
@@ -63,6 +64,12 @@ function buildDiscColors(hue, shade, cols, mode) {
     return colors.map(c => c.hex)
   }
 }
+
+// ─── Hue filter dots for Palettes tab ────────────────────────
+const HUE_DOTS = [
+  { h: null, c: '#505060' }, { h: 0, c: '#e05050' }, { h: 25, c: '#e07820' }, { h: 55, c: '#c4b010' },
+  { h: 120, c: '#38a838' }, { h: 175, c: '#18a098' }, { h: 215, c: '#3068d0' }, { h: 265, c: '#7040c8' }, { h: 320, c: '#c03888' },
+]
 
 // ─── Theme presets ───────────────────────────────────────────
 const THEMES = [{ a: '#8CABFF' }, { a: '#6EC98A' }, { a: '#F78D60' }, { a: '#C060C0' }, { a: '#FFCC44' }]
@@ -280,6 +287,114 @@ export default function SwatchStudio() {
 
   const fidLabel = fidelity < 30 ? 'tight' : fidelity > 70 ? 'wild' : 'balanced'
   const filledPalettes = palettes.filter(p => p && p.length)
+
+  // ══════════════════════════════════════════════════════════
+  // PALETTES STATE
+  // ══════════════════════════════════════════════════════════
+  const [savedPals, setSavedPals] = useState([
+    { name: 'Fire & Ember', colors: ['#B12C00', '#EB5B00', '#F78D60', '#FFCC44'], src: 'colorhunt', date: 'Apr 4', tags: ['warm'] },
+    { name: 'Orchid Night', colors: ['#1A0030', '#6A0DAD', '#C060C0', '#F0A8D0'], src: 'colorhunt', date: 'Apr 4', tags: ['dark'] },
+    { name: 'Ocean Drift', colors: ['#003049', '#006494', '#0096C7', '#90E0EF'], src: 'colorhunt', date: 'Apr 3', tags: ['cool'] },
+    { name: 'Sage Morning', colors: ['#2D4739', '#4E8B6B', '#A8C5A0', '#D8E8D0'], src: 'generated', date: 'Apr 3', tags: ['natural'] },
+  ])
+  const [palSrc, setPalSrc] = useState('all')
+  const [palHueDot, setPalHueDot] = useState(0)
+  const [palSearch, setPalSearch] = useState('')
+
+  const filteredSavedPals = savedPals.filter(p => {
+    if (palSrc !== 'all' && p.src !== palSrc) return false
+    if (palHueDot > 0) {
+      const dot = HUE_DOTS[palHueDot]
+      if (dot && dot.h !== null) {
+        const avg = p.colors.reduce((s, hex) => {
+          const [r, g, b] = [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]
+          const mx = Math.max(r, g, b), mn = Math.min(r, g, b)
+          if (mx === mn) return s
+          const d = mx - mn
+          let hh; if (mx === r) hh = ((g - b) / d + (g < b ? 6 : 0)) / 6; else if (mx === g) hh = ((b - r) / d + 2) / 6; else hh = ((r - g) / d + 4) / 6
+          return s + hh * 360
+        }, 0) / p.colors.length
+        const d = Math.abs(avg - dot.h)
+        if (d > 50 && d < 310) return false
+      }
+    }
+    return true
+  })
+
+  function handlePalSearch() {
+    const v = palSearch.trim()
+    if (!v) return
+    // Check for ColorHunt URL
+    if (v.includes('colorhunt.co/palette/')) {
+      const cols = (v.split('/palette/')[1] || '').match(/[0-9a-fA-F]{6}/g) || []
+      if (cols.length >= 4) {
+        setSavedPals(prev => [{ name: 'ColorHunt Import', colors: cols.slice(0, 4).map(c => `#${c}`), src: 'colorhunt', date: new Date().toLocaleDateString(), tags: ['imported'] }, ...prev])
+        setPalSearch('')
+        notify('Imported!')
+        return
+      }
+    }
+    notify('Searching…')
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // SCANNED STATE
+  // ══════════════════════════════════════════════════════════
+  const [scanMode, setScanMode] = useState('standard')
+  const [scanColors, setScanColors] = useState([])
+  const [scanImage, setScanImage] = useState(null)
+  const [scanHistory, setScanHistory] = useState([])
+  const [scanning, setScanning] = useState(false)
+  const fileRef = useRef(null)
+  const cameraRef = useRef(null)
+
+  function preprocessImage(imgEl, mode) {
+    const maxSize = mode === 'precise' ? 800 : 300
+    const blurRadius = mode === 'precise' ? 2 : 6
+    const quality = mode === 'precise' ? 0.95 : 0.85
+    let { width, height } = imgEl
+    if (width > maxSize || height > maxSize) {
+      const scale = maxSize / Math.max(width, height)
+      width = Math.round(width * scale); height = Math.round(height * scale)
+    }
+    const c1 = document.createElement('canvas')
+    c1.width = width; c1.height = height
+    c1.getContext('2d').drawImage(imgEl, 0, 0, width, height)
+    const c2 = document.createElement('canvas')
+    c2.width = width; c2.height = height
+    const ctx2 = c2.getContext('2d')
+    ctx2.filter = `blur(${blurRadius}px)`
+    ctx2.drawImage(c1, 0, 0)
+    return { base64: c2.toDataURL('image/jpeg', quality).split(',')[1] }
+  }
+
+  async function handleScanFile(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    let dataUrl = ''
+    await new Promise(resolve => { reader.onload = ev => { dataUrl = ev.target.result; setScanImage(dataUrl); resolve() }; reader.readAsDataURL(file) })
+    setScanColors([]); setScanning(true)
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const el = new Image(); el.onload = () => resolve(el); el.onerror = reject; el.src = dataUrl
+      })
+      const { base64 } = preprocessImage(img, scanMode)
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 600,
+          system: 'Extract 3-6 dominant colors. Return ONLY JSON: [{"hex":"#RRGGBB","name":"name","coverage":"dominant|accent|subtle"}]',
+          messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } }, { type: 'text', text: 'Extract colors.' }] }] }),
+      })
+      const data = await res.json()
+      const colors = JSON.parse((data.content?.[0]?.text || '').replace(/```json|```/g, '').trim())
+      setScanColors(colors)
+      setScanHistory(prev => [{ colors: colors.map(c => c.hex), date: new Date().toLocaleDateString(), image: dataUrl }, ...prev])
+    } catch { notify("Couldn't read this image") }
+    finally { setScanning(false) }
+  }
 
   const hueCircleColor = hslHex(dHue, 72, 52)
   const shadeCircleColor = hslHex(dHue, 70, dShade / 100 * 70 + 15)
@@ -524,17 +639,172 @@ export default function SwatchStudio() {
         </div>
       </div>
 
-      {/* ═══════════ PALETTES (Stage 3) ═══════════ */}
+      {/* ═══════════ PALETTES ═══════════ */}
       <div className={`panel${activeTab === 'palettes' ? ' on' : ''}`}>
-        <div style={{ padding: 20, textAlign: 'center', color: 'var(--t2)', fontSize: 11 }}>
-          Palettes tab — coming in Stage 3
+        <div className="ptab-ctrl">
+          {/* Search/URL bar */}
+          <div className="srch-row">
+            <input className="srch-inp" type="text" placeholder="Search or paste a ColorHunt URL…"
+              value={palSearch} onChange={e => setPalSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handlePalSearch() }} />
+            <button className="srch-btn" onClick={handlePalSearch}>Search</button>
+          </div>
+          {/* Filter words */}
+          <div className="filt-words">
+            {['all', 'colorhunt', 'custom', 'generated'].map(s => (
+              <button key={s} className={`fw${palSrc === s ? ' on' : ''}`}
+                onClick={() => setPalSrc(s)}>
+                {s === 'all' ? 'All' : s === 'colorhunt' ? 'ColorHunt' : s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+          {/* Hue dots */}
+          <div className="hdots">
+            {HUE_DOTS.map((dot, i) => (
+              <div key={i} className={`hd${palHueDot === i ? ' on' : ''}`}
+                style={{ background: dot.c }}
+                onClick={() => setPalHueDot(palHueDot === i ? 0 : i)} />
+            ))}
+          </div>
+        </div>
+        {/* Palette cards list */}
+        <div className="pal-list">
+          {filteredSavedPals.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 24, fontSize: 11, color: 'var(--t3)' }}>No palettes yet</div>
+          ) : filteredSavedPals.map((p, pi) => (
+            <div key={pi} className="pcard">
+              <div className="pstrip-row">
+                {p.colors.map((h, i) => (
+                  <div key={h + i} className="psc" style={{ background: h }} onClick={() => copyHex(h)}>
+                    <div className="psc-hex">{h}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="pinfo">
+                <div className="pmeta-wrap">
+                  <span className="pname">{p.name}</span>
+                  <div className="pmeta-inline">
+                    <span className="ptag">{p.src}</span>
+                    {(p.tags || []).map(t => <span key={t} className="ptag">{t}</span>)}
+                    <span className="pdate">{p.date}</span>
+                  </div>
+                </div>
+                <div className="picons">
+                  <button className="pi" title="Load" style={{ color: '#6EC98A' }}
+                    onClick={() => { setQueue(p.colors.filter(h => !queue.includes(h))); setActiveTab('browse'); notify('Loaded into queue') }}>
+                    <ArrowUpToLine size={14} />
+                  </button>
+                  <button className="pi" title="Copy" style={{ color: '#8CABFF' }}
+                    onClick={() => copyHex(`/* ${p.name} */\n${p.colors.join(', ')}`)}>
+                    <Copy size={14} />
+                  </button>
+                  <button className="pi" title="Share" style={{ color: '#FFCC44' }}
+                    onClick={() => notify('Share — coming soon')}>
+                    <Share2 size={14} />
+                  </button>
+                  <button className="pi" title="Delete" style={{ color: '#FF5555' }}
+                    onClick={() => { setSavedPals(prev => prev.filter((_, j) => j !== pi)); notify('Deleted') }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ═══════════ SCANNED (Stage 4) ═══════════ */}
+      {/* ═══════════ SCANNED ═══════════ */}
       <div className={`panel${activeTab === 'scanned' ? ' on' : ''}`}>
-        <div style={{ padding: 20, textAlign: 'center', color: 'var(--t2)', fontSize: 11 }}>
-          Scanned tab — coming in Stage 4
+        <div className="scan-ctrl">
+          <div className="scan-title">Upload or scan a photo to extract colors</div>
+          {/* Standard/Precise toggle */}
+          <div className="prec-toggle">
+            <button className={`prec-opt${scanMode === 'standard' ? ' on' : ''}`} onClick={() => setScanMode('standard')}>Standard</button>
+            <button className={`prec-opt${scanMode === 'precise' ? ' on' : ''}`} onClick={() => setScanMode('precise')}>Precise</button>
+          </div>
+          <div className="scan-btns-row">
+            <button className="sbt primary" onClick={() => fileRef.current?.click()}>Upload photo</button>
+            <button className="sbt" onClick={() => cameraRef.current?.click()}>Open camera</button>
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleScanFile} />
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleScanFile} />
+        </div>
+
+        {/* Scan result */}
+        {scanColors.length > 0 && (
+          <div className="scan-result">
+            <div className="scan-inner">
+              {scanImage && (
+                <div style={{ width: 54, height: 54, borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
+                  <img src={scanImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+              )}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, color: 'white', fontWeight: 600, marginBottom: 6 }}>{scanColors.length} colors detected</div>
+                <div className="scan-cg">
+                  {scanColors.map((c, i) => (
+                    <div key={i} className="scan-item" onClick={() => copyHex(c.hex)}>
+                      <div className="scan-sw" style={{ background: c.hex }} />
+                      <span className="scan-cn">{c.hex}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="scan-acts">
+              <button className="wa wa-keep" onClick={() => {
+                setSavedPals(prev => [...prev, { name: `Scan ${new Date().toLocaleDateString()}`, colors: scanColors.map(c => c.hex), src: 'scanned', date: new Date().toLocaleDateString(), tags: ['scanned'] }])
+                notify('Saved to Palettes!')
+              }}>Save to Palettes</button>
+              <span className="wa-sep">·</span>
+              <button className="wa wa-copy" onClick={() => {
+                setQueue(prev => [...prev, ...scanColors.map(c => c.hex).filter(h => !prev.includes(h))])
+                setActiveTab('browse')
+                notify('Colors in queue — tap ↑ to push')
+              }}>Send to Queue</button>
+              <span className="wa-sep">·</span>
+              <button className="wa wa-share" onClick={() => notify('Share — coming soon')}>Share</button>
+              <span className="wa-sep">·</span>
+              <button className="wa wa-dis" onClick={() => { setScanColors([]); setScanImage(null) }}>Clear</button>
+            </div>
+          </div>
+        )}
+
+        {/* Scan library */}
+        <div className="scan-list-wrap">
+          <div className="scan-lib-hdr">
+            <span className="scan-lib-lbl">SCAN LIBRARY · {scanHistory.length} SCANS</span>
+            {scanHistory.length > 0 && (
+              <button className="wa wa-dis" onClick={() => { setScanHistory([]); notify('Cleared') }}>Clear all</button>
+            )}
+          </div>
+          {scanHistory.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 20, fontSize: 11, color: 'var(--t3)' }}>No scans yet</div>
+          ) : scanHistory.map((scan, i) => (
+            <div key={i} className="sentry">
+              {scan.image && (
+                <div style={{ width: 46, height: 46, borderRadius: 6, overflow: 'hidden', flexShrink: 0 }}>
+                  <img src={scan.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="se-chips">
+                  {scan.colors.map((h, j) => (
+                    <div key={j} className="se-chip" style={{ background: h }} onClick={() => copyHex(h)} />
+                  ))}
+                </div>
+                <div className="se-meta">{scan.date}</div>
+                <div className="se-acts">
+                  <button className="wa wa-keep" onClick={() => {
+                    setSavedPals(prev => [...prev, { name: `Scan ${scan.date}`, colors: [...scan.colors], src: 'scanned', date: scan.date, tags: ['scanned'] }])
+                    notify('Saved!')
+                  }}>+ Save</button>
+                  <span className="wa-sep">·</span>
+                  <button className="wa wa-share" onClick={() => notify('Share — coming soon')}>Share</button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

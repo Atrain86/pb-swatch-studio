@@ -29,10 +29,10 @@ body { background: #1a1a2e; display: flex; justify-content: center; padding: 1re
 .tabs { display: flex; border-bottom: 1px solid var(--div); flex-shrink: 0; background: var(--bg2); padding: 0 8px; }
 .tab { flex: 1; padding: 9px 4px; text-align: center; cursor: pointer; font-size: 12px; color: white; border: none; border-bottom: 2px solid transparent; transition: all .18s; font-weight: 500; background: none; font-family: inherit; opacity: .75; }
 .tab:hover { opacity: 1; }
-.tab.on[data-t=discover] { border-bottom-color: var(--tc-d); opacity: 1; }
-.tab.on[data-t=browse] { border-bottom-color: var(--tc-b); opacity: 1; }
-.tab.on[data-t=palettes] { border-bottom-color: var(--tc-p); opacity: 1; }
-.tab.on[data-t=scanned] { border-bottom-color: var(--tc-s); opacity: 1; }
+.tab.on[data-t=discover] { color: var(--tc-d); border-bottom-color: var(--tc-d); opacity: 1; }
+.tab.on[data-t=browse] { color: var(--tc-b); border-bottom-color: var(--tc-b); opacity: 1; }
+.tab.on[data-t=palettes] { color: var(--tc-p); border-bottom-color: var(--tc-p); opacity: 1; }
+.tab.on[data-t=scanned] { color: var(--tc-s); border-bottom-color: var(--tc-s); opacity: 1; }
 
 .panel { display: none; flex: 1; overflow: hidden; flex-direction: column; }
 .panel.on { display: flex; }
