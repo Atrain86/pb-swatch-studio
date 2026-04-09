@@ -81,6 +81,8 @@ const LAB_COMBOS = [
   { c1: '#FFCC44', c2: '#F07848', c3: '#C060C0', c4: '#6EC98A', c5: 'rgba(255,255,255,.35)' },
 ]
 
+const APP_VERSION = '3.0.0'
+
 // ═════════════════════════════════════════════════════════════
 export default function SwatchStudio() {
   // ── Theme ──
@@ -91,6 +93,13 @@ export default function SwatchStudio() {
     r.setProperty('--ic1', c.c1); r.setProperty('--ic2', c.c2)
     r.setProperty('--ic3', c.c3); r.setProperty('--ic4', c.c4); r.setProperty('--ic5', c.c5)
   }, [themeIdx])
+
+  // ── Update banner ──
+  const [updateReady, setUpdateReady] = useState(false)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    navigator.serviceWorker.addEventListener('controllerchange', () => setUpdateReady(true))
+  }, [])
 
   // ── Tabs ──
   const [activeTab, setActiveTab] = useState('discover')
@@ -162,7 +171,22 @@ export default function SwatchStudio() {
   const [genScheme, setGenScheme] = useState([])
   const [genVisible, setGenVisible] = useState(false)
   const [fidelity, setFidelity] = useState(40)
+  const [hexImport, setHexImport] = useState('')
   const pushRef = useRef(null)
+
+  function importHexes() {
+    if (!hexImport.trim()) return
+    const raw = hexImport.replace(/[^#0-9a-fA-F,\s]/g, '').split(/[\s,]+/)
+    const valid = raw.map(s => {
+      const h = s.startsWith('#') ? s : '#' + s
+      return /^#[0-9a-fA-F]{6}$/.test(h) ? h.toUpperCase() : null
+    }).filter(Boolean)
+    if (!valid.length) { notify('No valid hex colors found'); return }
+    const added = valid.filter(h => !queue.includes(h))
+    setQueue(prev => [...prev, ...added])
+    setHexImport('')
+    notify(`${added.length} color${added.length !== 1 ? 's' : ''} added to queue`)
+  }
 
   // Browse library — sorted by hue then lightness
   const [browseLib] = useState(() => {
@@ -348,10 +372,57 @@ export default function SwatchStudio() {
   const fileRef = useRef(null)
   const cameraRef = useRef(null)
 
+  function gaussianBlurCanvas(srcCanvas, radius) {
+    // Pure JS box-blur approximation of Gaussian (3 passes = very close to Gaussian)
+    const src = srcCanvas.getContext('2d').getImageData(0, 0, srcCanvas.width, srcCanvas.height)
+    const w = src.width, h = src.height
+    const d = new Uint8ClampedArray(src.data)
+    const tmp = new Uint8ClampedArray(src.data.length)
+    const r = Math.max(1, Math.round(radius))
+    function boxBlurH(inp, out) {
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          let rr = 0, g = 0, b = 0, a = 0, cnt = 0
+          for (let kx = -r; kx <= r; kx++) {
+            const cx = Math.min(w - 1, Math.max(0, x + kx))
+            const i = (y * w + cx) * 4
+            rr += inp[i]; g += inp[i+1]; b += inp[i+2]; a += inp[i+3]; cnt++
+          }
+          const i = (y * w + x) * 4
+          out[i] = rr/cnt; out[i+1] = g/cnt; out[i+2] = b/cnt; out[i+3] = a/cnt
+        }
+      }
+    }
+    function boxBlurV(inp, out) {
+      for (let x = 0; x < w; x++) {
+        for (let y = 0; y < h; y++) {
+          let rr = 0, g = 0, b = 0, a = 0, cnt = 0
+          for (let ky = -r; ky <= r; ky++) {
+            const cy = Math.min(h - 1, Math.max(0, y + ky))
+            const i = (cy * w + x) * 4
+            rr += inp[i]; g += inp[i+1]; b += inp[i+2]; a += inp[i+3]; cnt++
+          }
+          const i = (y * w + x) * 4
+          out[i] = rr/cnt; out[i+1] = g/cnt; out[i+2] = b/cnt; out[i+3] = a/cnt
+        }
+      }
+    }
+    // 3 passes for Gaussian approximation
+    boxBlurH(d, tmp); boxBlurV(tmp, d)
+    boxBlurH(d, tmp); boxBlurV(tmp, d)
+    boxBlurH(d, tmp); boxBlurV(tmp, d)
+    const out = srcCanvas.getContext('2d').createImageData(w, h)
+    out.data.set(d)
+    const dst = document.createElement('canvas')
+    dst.width = w; dst.height = h
+    dst.getContext('2d').putImageData(out, 0, 0)
+    return dst
+  }
+
   function preprocessImage(imgEl, mode) {
-    const maxSize = mode === 'precise' ? 800 : 300
-    const blurRadius = mode === 'precise' ? 2 : 6
-    const quality = mode === 'precise' ? 0.95 : 0.85
+    const maxSize = mode === 'precise' ? 600 : 200
+    const blurRadius = mode === 'precise' ? 4 : 12
+    const quality = mode === 'precise' ? 0.92 : 0.82
     let { width, height } = imgEl
     if (width > maxSize || height > maxSize) {
       const scale = maxSize / Math.max(width, height)
@@ -360,12 +431,8 @@ export default function SwatchStudio() {
     const c1 = document.createElement('canvas')
     c1.width = width; c1.height = height
     c1.getContext('2d').drawImage(imgEl, 0, 0, width, height)
-    const c2 = document.createElement('canvas')
-    c2.width = width; c2.height = height
-    const ctx2 = c2.getContext('2d')
-    ctx2.filter = `blur(${blurRadius}px)`
-    ctx2.drawImage(c1, 0, 0)
-    return { base64: c2.toDataURL('image/jpeg', quality).split(',')[1] }
+    const blurred = gaussianBlurCanvas(c1, blurRadius)
+    return { base64: blurred.toDataURL('image/jpeg', quality).split(',')[1] }
   }
 
   async function handleScanFile(e) {
@@ -389,10 +456,17 @@ export default function SwatchStudio() {
           messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } }, { type: 'text', text: 'Extract colors.' }] }] }),
       })
       const data = await res.json()
-      const colors = JSON.parse((data.content?.[0]?.text || '').replace(/```json|```/g, '').trim())
+      if (data.error) throw new Error(data.error.message || 'API error')
+      const raw = (data.content?.[0]?.text || '').replace(/```json|```/g, '').trim()
+      if (!raw) throw new Error('Empty response')
+      const colors = JSON.parse(raw)
+      if (!Array.isArray(colors) || !colors.length) throw new Error('No colors returned')
       setScanColors(colors)
       setScanHistory(prev => [{ colors: colors.map(c => c.hex), date: new Date().toLocaleDateString(), image: dataUrl }, ...prev])
-    } catch { notify("Couldn't read this image") }
+    } catch (err) {
+      console.error('[Scan]', err)
+      notify(err.message?.includes('API') ? 'API error — check key' : "Couldn't read the image")
+    }
     finally { setScanning(false) }
   }
 
@@ -453,7 +527,10 @@ export default function SwatchStudio() {
             onError={e => { e.target.style.display = 'none' }} />
           <div>
             <div className="brand-name">PaintBrain</div>
-            <div className="brand-sub">ColorShare Studio</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div className="brand-sub">ColorShare Studio</div>
+              <span className="ver-badge">v{APP_VERSION}</span>
+            </div>
           </div>
         </div>
         <div className="tdots">
@@ -463,6 +540,13 @@ export default function SwatchStudio() {
           ))}
         </div>
       </div>
+
+      {/* ── Update banner ── */}
+      {updateReady && (
+        <div className="update-banner" onClick={() => window.location.reload()}>
+          Update available — tap to refresh
+        </div>
+      )}
 
       {/* ── Tab bar ── */}
       <div className="tabs">
@@ -590,6 +674,18 @@ export default function SwatchStudio() {
               <span className="ib-icon" style={{ color: 'var(--ic5)' }}>✕</span>
               <span className="ib-lbl" style={{ color: 'var(--ic5)' }}>Clear</span>
             </button>
+            <div className="ib-div" />
+            <div className="hex-import-wrap">
+              <input
+                className="hex-import-inp"
+                type="text"
+                placeholder="#hex, #hex…"
+                value={hexImport}
+                onChange={e => setHexImport(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') importHexes() }}
+              />
+              <button className="hex-import-btn" onClick={importHexes} title="Import">+</button>
+            </div>
           </div>
 
           {/* Row 2: Palette editor strip */}
