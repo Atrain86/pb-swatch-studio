@@ -81,7 +81,7 @@ const LAB_COMBOS = [
   { c1: '#FFCC44', c2: '#F07848', c3: '#C060C0', c4: '#6EC98A', c5: 'rgba(255,255,255,.35)' },
 ]
 
-const APP_VERSION = '3.0.0'
+const APP_VERSION = '3.0.1'
 
 // ═════════════════════════════════════════════════════════════
 export default function SwatchStudio() {
