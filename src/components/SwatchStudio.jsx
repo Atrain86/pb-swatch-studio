@@ -396,6 +396,45 @@ export default function SwatchStudio() {
     finally { setScanning(false) }
   }
 
+  // ══════════════════════════════════════════════════════════
+  // OVERLAYS
+  // ══════════════════════════════════════════════════════════
+  const [expandOpen, setExpandOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareData, setShareData] = useState({ name: '', colors: [] })
+
+  function openExpand() {
+    if (!filledPalettes.length) return
+    setExpandOpen(true)
+  }
+
+  function openShare(name, colors) {
+    setShareData({ name, colors })
+    setShareOpen(true)
+  }
+
+  function doShareOpt(type) {
+    if (type === 'hex') {
+      copyHex(`/* ${shareData.name} */\n${shareData.colors.join(', ')}`)
+    } else if (type === 'css') {
+      const css = shareData.colors.map((h, i) => `  --color-${i + 1}: ${h};`).join('\n')
+      copyHex(`:root {\n${css}\n}`)
+    } else {
+      notify(`${type} — coming soon`)
+    }
+    setShareOpen(false)
+  }
+
+  // Wire double-tap on strip to open expand
+  const stripTapRef = useRef(0)
+  function handleStripClick(e) {
+    if (e.target.classList?.contains('ps-chip') || e.target.classList?.contains('pcol-del')) return
+    const now = Date.now()
+    if (now - stripTapRef.current < 320) { openExpand(); stripTapRef.current = 0; return }
+    stripTapRef.current = now
+    onStripTap()
+  }
+
   const hueCircleColor = hslHex(dHue, 72, 52)
   const shadeCircleColor = hslHex(dHue, 70, dShade / 100 * 70 + 15)
   const shadeTrackBg = `linear-gradient(to right, ${hslHex(dHue, 70, 15)}, ${hslHex(dHue, 75, 50)}, ${hslHex(dHue, 60, 82)})`
@@ -539,7 +578,10 @@ export default function SwatchStudio() {
               <span className="ib-icon" style={{ color: 'var(--ic3)' }}>⎘</span>
               <span className="ib-lbl" style={{ color: 'var(--ic3)' }}>Copy</span>
             </button>
-            <button className="ib" onClick={() => notify('Share — coming soon')} title="Share">
+            <button className="ib" onClick={() => {
+              const pal = viewState === 'split' ? palettes[0] || [] : palettes[viewState] || []
+              if (pal.length) openShare('Palette', pal); else notify('Nothing to share')
+            }} title="Share">
               <span className="ib-icon" style={{ color: 'var(--ic4)' }}>↗</span>
               <span className="ib-lbl" style={{ color: 'var(--ic4)' }}>Share</span>
             </button>
@@ -552,7 +594,7 @@ export default function SwatchStudio() {
 
           {/* Row 2: Palette editor strip */}
           <div className="pal-editor-zone">
-            <div className="mstrip" onClick={onStripTap}>
+            <div className="mstrip" onClick={handleStripClick}>
               {filledPalettes.length === 0 ? (
                 <span className="pe-empty">Push colors ↑ to build palettes here</span>
               ) : viewState === 'split' ? (
@@ -699,7 +741,7 @@ export default function SwatchStudio() {
                     <Copy size={14} />
                   </button>
                   <button className="pi" title="Share" style={{ color: '#FFCC44' }}
-                    onClick={() => notify('Share — coming soon')}>
+                    onClick={() => openShare(p.name, p.colors)}>
                     <Share2 size={14} />
                   </button>
                   <button className="pi" title="Delete" style={{ color: '#FF5555' }}
@@ -807,6 +849,70 @@ export default function SwatchStudio() {
           ))}
         </div>
       </div>
+      {/* ═══════════ EXPAND OVERLAY ═══════════ */}
+      {expandOpen && (
+        <div className="exp-ov on" onClick={e => { if (e.target === e.currentTarget) setExpandOpen(false) }}>
+          <div className="exp-hint">Tap color to copy · × on palette to delete it · tap background to close</div>
+          <div className="exp-pals">
+            {filledPalettes.map((pal, ci) => {
+              const ri = palettes.indexOf(pal)
+              return (
+                <div key={ci} className="exp-pal-col">
+                  <div className="exp-pal-lbl">Palette {'ABCDEFGH'[ci]}</div>
+                  <div className="exp-pal-del" onClick={e => {
+                    e.stopPropagation()
+                    deletePalColumn(ri)
+                    if (palettes.filter(p => p && p.length).length <= 1) setExpandOpen(false)
+                  }}>×</div>
+                  {pal.map((h, i) => (
+                    <div key={h + i} className="exp-color-chip" style={{ background: h }}
+                      onClick={e => {
+                        e.stopPropagation()
+                        copyHex(h)
+                        removeStripColor(ri, i)
+                        if (!palettes.flat().filter(Boolean).length) setExpandOpen(false)
+                      }} />
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+          <div className="exp-close">Tap background to close</div>
+        </div>
+      )}
+
+      {/* ═══════════ SHARE SHEET ═══════════ */}
+      {shareOpen && (
+        <div className="share-ov on" onClick={e => { if (e.target === e.currentTarget) setShareOpen(false) }}>
+          <div className="share-sheet" onClick={e => e.stopPropagation()}>
+            <div className="share-title">{shareData.name}</div>
+            <div className="share-strip">
+              {shareData.colors.map((h, i) => (
+                <div key={h + i} style={{ flex: 1, background: h }} />
+              ))}
+            </div>
+            <div className="share-opts">
+              <div className="share-opt" onClick={() => doShareOpt('hex')}>
+                <div className="share-opt-icon">📋</div>
+                <div className="share-opt-lbl">Copy hex codes</div>
+              </div>
+              <div className="share-opt" onClick={() => doShareOpt('css')}>
+                <div className="share-opt-icon">💻</div>
+                <div className="share-opt-lbl">Copy as CSS</div>
+              </div>
+              <div className="share-opt" onClick={() => doShareOpt('img')}>
+                <div className="share-opt-icon">🖼</div>
+                <div className="share-opt-lbl">Share as image</div>
+              </div>
+              <div className="share-opt" onClick={() => doShareOpt('link')}>
+                <div className="share-opt-icon">🔗</div>
+                <div className="share-opt-lbl">Copy share link</div>
+              </div>
+            </div>
+            <button className="share-cancel" onClick={() => setShareOpen(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
