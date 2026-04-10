@@ -103,7 +103,7 @@ const LAB_COMBOS = [
   { c1: '#FFCC44', c2: '#F07848', c3: '#C060C0', c4: '#6EC98A', c5: 'rgba(255,255,255,.35)' },
 ]
 
-const APP_VERSION = '3.1.0'
+const APP_VERSION = '3.1.1'
 
 // ═════════════════════════════════════════════════════════════
 export default function SwatchStudio() {
@@ -926,7 +926,7 @@ export default function SwatchStudio() {
           <div className="pp-center">
             <div className="pp-image-wrap">
               <img src={scanRawImage} alt="scan preview" className="pp-image"
-                style={{ filter: `brightness(${1 + ppBrightness/100}) saturate(${ppSaturation/100})` }} />
+                style={{ filter: `blur(${ppBlur * 0.5}px) brightness(${1 + ppBrightness/100}) saturate(${ppSaturation/100}) sepia(${Math.max(0, ppWarmth) / 100}) hue-rotate(${ppWarmth < 0 ? ppWarmth * 0.5 : 0}deg)` }} />
             </div>
             <div className="pp-sliders">
               {[
