@@ -1,7 +1,6 @@
 // ============================================================
 // PaintBrain — ColorShare Studio v3
-// Tabs: Discover · Browse · Palettes · Scanned
-// Stage 1: Shell + Discover tab
+// Tabs: Discover · Create · Palettes · Scan
 // ============================================================
 
 import { useState, useRef, useEffect } from 'react'
@@ -34,35 +33,58 @@ function hslHex(h, s, l) {
 const daySeed = (() => { const d = new Date(); return d.getFullYear() * 365 + d.getMonth() * 30 + d.getDate() })()
 function sr(n) { let x = Math.sin(daySeed + n * 7.93) * 1e5; return x - Math.floor(x) }
 
-function buildDiscColors(hue, shade, cols, mode) {
-  const n = Math.max(50, cols * 9)
-  if (mode === 'all') {
-    const colors = []
-    for (let i = 0; i < n; i++) {
-      const ha = (hue + (i / n) * 360) % 360
-      const sat = 55 + sr(i * 5) * 30
-      const row = Math.floor(i / cols)
-      const totalRows = Math.ceil(n / cols)
-      const L = Math.max(15, Math.min(88, shade - 20 + (row / totalRows) * 40))
-      const rad = ha * Math.PI / 180
-      colors.push({ hex: l2h(L, sat * Math.cos(rad), sat * Math.sin(rad)), hue: ha, L })
+// ─── LAB color engine — Khroma-quality generation ────────────
+function labInGamut(L, A, B) {
+  // Convert LAB → linear RGB, check all channels in [0,1]
+  const fy = (L + 16) / 116, fx = A / 500 + fy, fz = fy - B / 200
+  const x = 0.95047 * (fx > 0.2069 ? fx ** 3 : (fx - 16/116) / 7.787)
+  const y =            (fy > 0.2069 ? fy ** 3 : (fy - 16/116) / 7.787)
+  const z = 1.08883 * (fz > 0.2069 ? fz ** 3 : (fz - 16/116) / 7.787)
+  const r = x * 3.2406 + y * -1.5372 + z * -0.4986
+  const g = x * -0.9689 + y * 1.8758 + z * 0.0415
+  const b = x * 0.0557 + y * -0.2040 + z * 1.057
+  return r >= -0.01 && r <= 1.01 && g >= -0.01 && g <= 1.01 && b >= -0.01 && b <= 1.01
+}
+
+// Generate one beautiful LAB color using pure Math.random (not seeded — truly random each call)
+function randomLabColor() {
+  for (let attempts = 0; attempts < 30; attempts++) {
+    const L = 25 + Math.random() * 60        // 25–85
+    const a = (Math.random() - 0.5) * 100    // -50 to +50
+    const b = (Math.random() - 0.5) * 100    // -50 to +50
+    const chroma = Math.sqrt(a * a + b * b)
+    if (chroma >= 15 && chroma <= 70 && labInGamut(L, a, b)) {
+      return { hex: l2h(L, a, b), L, a, b }
     }
-    colors.sort((a, b) => { const hd = a.hue - b.hue; if (Math.abs(hd) > 8) return hd; return a.L - b.L })
-    return colors.map(c => c.hex)
-  } else {
-    const spread = 30, colors = []
-    for (let i = 0; i < n; i++) {
-      const ha = hue + (sr(i * 7) - 0.5) * spread * 2
-      const row = Math.floor(i / cols)
-      const totalRows = Math.ceil(n / cols)
-      const L = Math.max(15, Math.min(88, shade + 18 - (row / Math.max(totalRows, 1)) * 36))
-      const sat = i % 2 === 0 ? 55 + sr(i * 5) * 30 : 25 + sr(i * 5) * 25
-      const rad = ha * Math.PI / 180
-      colors.push({ hex: l2h(L, sat * Math.cos(rad), sat * Math.sin(rad)), L, sat })
-    }
-    colors.sort((a, b) => b.L - a.L)
-    return colors.map(c => c.hex)
   }
+  return { hex: l2h(55, -20, -15), L: 55, a: -20, b: -15 } // teal fallback
+}
+
+// Generate one batch of n random LAB colors, sorted dark→light
+function genRandomBatch(n = 40) {
+  const batch = []
+  while (batch.length < n) batch.push(randomLabColor())
+  batch.sort((x, y) => x.L - y.L)
+  return batch.map(c => c.hex)
+}
+
+// Generate a uniform batch covering LAB space systematically, sorted dark→light
+function genUniformBatch(offset = 0, n = 40) {
+  const hueSteps = 36, lSteps = [30, 45, 60, 75]
+  const colors = []
+  for (let hi = 0; hi < hueSteps; hi++) {
+    const angleRad = ((hi * 10) + offset * 5) * Math.PI / 180
+    const chroma = 40
+    for (const L of lSteps) {
+      const a = chroma * Math.cos(angleRad), b = chroma * Math.sin(angleRad)
+      if (labInGamut(L, a, b)) colors.push({ hex: l2h(L, a, b), L })
+    }
+  }
+  colors.sort((x, y) => x.L - y.L)
+  // Return n colors starting at offset position
+  const start = (offset * n) % Math.max(colors.length, 1)
+  const slice = [...colors.slice(start), ...colors.slice(0, start)].slice(0, n)
+  return slice.map(c => c.hex)
 }
 
 // ─── Hue filter dots for Palettes tab ────────────────────────
@@ -81,7 +103,7 @@ const LAB_COMBOS = [
   { c1: '#FFCC44', c2: '#F07848', c3: '#C060C0', c4: '#6EC98A', c5: 'rgba(255,255,255,.35)' },
 ]
 
-const APP_VERSION = '3.0.1'
+const APP_VERSION = '3.1.0'
 
 // ═════════════════════════════════════════════════════════════
 export default function SwatchStudio() {
@@ -102,7 +124,21 @@ export default function SwatchStudio() {
   }, [])
 
   // ── Tabs ──
+  const TABS = ['discover', 'create', 'palettes', 'scan']
   const [activeTab, setActiveTab] = useState('discover')
+
+  // ── Swipe navigation ──
+  const swipeTouchRef = useRef(null)
+  function onSwipeTouchStart(e) { swipeTouchRef.current = e.touches[0].clientX }
+  function onSwipeTouchEnd(e) {
+    if (swipeTouchRef.current === null) return
+    const dx = e.changedTouches[0].clientX - swipeTouchRef.current
+    swipeTouchRef.current = null
+    if (Math.abs(dx) < 50) return
+    const idx = TABS.indexOf(activeTab)
+    if (dx < 0 && idx < TABS.length - 1) setActiveTab(TABS[idx + 1])
+    else if (dx > 0 && idx > 0) setActiveTab(TABS[idx - 1])
+  }
 
   // ── Toast ──
   const [toast, setToast] = useState('')
@@ -112,36 +148,47 @@ export default function SwatchStudio() {
   // ══════════════════════════════════════════════════════════
   // DISCOVER STATE
   // ══════════════════════════════════════════════════════════
-  const [dMode, setDModeRaw] = useState('all')
-  const [dHue, setDHue] = useState(200)
-  const [dShade, setDShade] = useState(50)
+  const [dMode, setDModeRaw] = useState('random') // 'random' | 'uniform'
   const [dZoom, setDZoom] = useState(5)
   const [dPicks, setDPicks] = useState([])
-  const [dColors, setDColors] = useState(() => buildDiscColors(200, 50, 5, 'all'))
-
-  function rebuildGrid(hue, shade, zoom, mode) {
-    setDColors(buildDiscColors(hue, shade, zoom, mode))
-  }
+  const [dColors, setDColors] = useState(() => genRandomBatch(40))
+  const [dLoading, setDLoading] = useState(false)
+  const [dBatchOffset, setDBatchOffset] = useState(1)
+  const discGridRef = useRef(null)
 
   function setDMode(m) {
     setDModeRaw(m)
-    rebuildGrid(dHue, dShade, dZoom, m)
+    setDBatchOffset(1)
+    setDColors(m === 'random' ? genRandomBatch(40) : genUniformBatch(0, 40))
   }
 
-  function onHueChange(v) {
-    setDHue(v)
-    rebuildGrid(v, dShade, dZoom, dMode)
+  function onZoomChange(v) { setDZoom(v) }
+
+  function loadMoreColors() {
+    if (dLoading) return
+    setDLoading(true)
+    setTimeout(() => {
+      setDColors(prev => {
+        const next = dMode === 'random'
+          ? [...prev, ...genRandomBatch(40)]
+          : [...prev, ...genUniformBatch(dBatchOffset, 40)]
+        return next
+      })
+      setDBatchOffset(n => n + 1)
+      setDLoading(false)
+    }, 80)
   }
 
-  function onShadeChange(v) {
-    setDShade(v)
-    rebuildGrid(dHue, v, dZoom, dMode)
-  }
-
-  function onZoomChange(v) {
-    setDZoom(v)
-    rebuildGrid(dHue, dShade, v, dMode)
-  }
+  // Scroll sentinel for endless scroll
+  useEffect(() => {
+    const el = discGridRef.current
+    if (!el) return
+    const onScroll = () => {
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 200) loadMoreColors()
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  })
 
   function togglePick(hex) {
     if (dPicks.includes(hex)) {
@@ -157,12 +204,11 @@ export default function SwatchStudio() {
     setQueue(prev => [...prev, ...dPicks.filter(h => !prev.includes(h))])
     notify(`${dPicks.length} colors sent to queue!`)
     setDPicks([])
-    rebuildGrid(dHue, dShade, dZoom, dMode)
-    setActiveTab('browse')
+    setActiveTab('create')
   }
 
   // ══════════════════════════════════════════════════════════
-  // BROWSE STATE — two-stage: queue → push ↑ → palette editor
+  // CREATE STATE — two-stage: queue → push ↑ → palette editor
   // ══════════════════════════════════════════════════════════
   const [queue, setQueue] = useState([])
   const [palettes, setPalettes] = useState([]) // array of arrays
@@ -364,11 +410,16 @@ export default function SwatchStudio() {
   // ══════════════════════════════════════════════════════════
   // SCANNED STATE
   // ══════════════════════════════════════════════════════════
-  const [scanMode, setScanMode] = useState('standard')
   const [scanColors, setScanColors] = useState([])
   const [scanImage, setScanImage] = useState(null)
+  const [scanRawImage, setScanRawImage] = useState(null) // original before post-processing
   const [scanHistory, setScanHistory] = useState([])
   const [scanning, setScanning] = useState(false)
+  const [scanPostMode, setScanPostMode] = useState(false) // show post-processing center
+  const [ppBlur, setPpBlur] = useState(4)
+  const [ppWarmth, setPpWarmth] = useState(0)
+  const [ppBrightness, setPpBrightness] = useState(0)
+  const [ppSaturation, setPpSaturation] = useState(100)
   const fileRef = useRef(null)
   const cameraRef = useRef(null)
 
@@ -419,35 +470,54 @@ export default function SwatchStudio() {
     return dst
   }
 
-  function preprocessImage(imgEl, mode) {
-    const maxSize = mode === 'precise' ? 600 : 200
-    const blurRadius = mode === 'precise' ? 4 : 12
-    const quality = mode === 'precise' ? 0.92 : 0.82
+  function applyPostProcessing(imgEl, blur, warmth, brightness, saturation) {
+    const maxSize = 400
     let { width, height } = imgEl
     if (width > maxSize || height > maxSize) {
       const scale = maxSize / Math.max(width, height)
       width = Math.round(width * scale); height = Math.round(height * scale)
     }
-    const c1 = document.createElement('canvas')
-    c1.width = width; c1.height = height
-    c1.getContext('2d').drawImage(imgEl, 0, 0, width, height)
-    const blurred = gaussianBlurCanvas(c1, blurRadius)
-    return { base64: blurred.toDataURL('image/jpeg', quality).split(',')[1] }
+    const c = document.createElement('canvas')
+    c.width = width; c.height = height
+    const ctx = c.getContext('2d')
+    ctx.drawImage(imgEl, 0, 0, width, height)
+
+    // Per-pixel adjustments: warmth, brightness, saturation
+    if (warmth !== 0 || brightness !== 0 || saturation !== 100) {
+      const id = ctx.getImageData(0, 0, width, height)
+      const d = id.data
+      const bFactor = 1 + brightness / 100
+      const sFactor = saturation / 100
+      const wShift = warmth * 0.8 // warmth shifts R up/B down (warm) or R down/B up (cool)
+      for (let i = 0; i < d.length; i += 4) {
+        let r = d[i], g = d[i+1], b = d[i+2]
+        // Brightness
+        r *= bFactor; g *= bFactor; b *= bFactor
+        // Warmth
+        r += wShift; b -= wShift * 0.5
+        // Saturation — convert to grey and lerp
+        const grey = 0.299 * r + 0.587 * g + 0.114 * b
+        r = grey + (r - grey) * sFactor
+        g = grey + (g - grey) * sFactor
+        b = grey + (b - grey) * sFactor
+        d[i] = Math.max(0, Math.min(255, r))
+        d[i+1] = Math.max(0, Math.min(255, g))
+        d[i+2] = Math.max(0, Math.min(255, b))
+      }
+      ctx.putImageData(id, 0, 0)
+    }
+
+    // Blur pass
+    if (blur > 0) {
+      const blurred = gaussianBlurCanvas(c, blur)
+      return blurred.toDataURL('image/jpeg', 0.88).split(',')[1]
+    }
+    return c.toDataURL('image/jpeg', 0.88).split(',')[1]
   }
 
-  async function handleScanFile(e) {
-    const file = e.target.files[0]
-    if (!file) return
-    e.target.value = ''
-    const reader = new FileReader()
-    let dataUrl = ''
-    await new Promise(resolve => { reader.onload = ev => { dataUrl = ev.target.result; setScanImage(dataUrl); resolve() }; reader.readAsDataURL(file) })
+  async function runExtraction(base64, dataUrl) {
     setScanColors([]); setScanning(true)
     try {
-      const img = await new Promise((resolve, reject) => {
-        const el = new Image(); el.onload = () => resolve(el); el.onerror = reject; el.src = dataUrl
-      })
-      const { base64 } = preprocessImage(img, scanMode)
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
@@ -462,12 +532,35 @@ export default function SwatchStudio() {
       const colors = JSON.parse(raw)
       if (!Array.isArray(colors) || !colors.length) throw new Error('No colors returned')
       setScanColors(colors)
+      setScanPostMode(false)
       setScanHistory(prev => [{ colors: colors.map(c => c.hex), date: new Date().toLocaleDateString(), image: dataUrl }, ...prev])
     } catch (err) {
       console.error('[Scan]', err)
       notify(err.message?.includes('API') ? 'API error — check key' : "Couldn't read the image")
-    }
-    finally { setScanning(false) }
+    } finally { setScanning(false) }
+  }
+
+  async function handleScanFile(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    let dataUrl = ''
+    await new Promise(resolve => { reader.onload = ev => { dataUrl = ev.target.result; resolve() }; reader.readAsDataURL(file) })
+    setScanRawImage(dataUrl)
+    setScanImage(dataUrl)
+    setScanColors([])
+    setPpBlur(4); setPpWarmth(0); setPpBrightness(0); setPpSaturation(100)
+    setScanPostMode(true)
+  }
+
+  async function handleGeneratePalette() {
+    if (!scanRawImage) return
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image(); el.onload = () => resolve(el); el.onerror = reject; el.src = scanRawImage
+    })
+    const base64 = applyPostProcessing(img, ppBlur, ppWarmth, ppBrightness, ppSaturation)
+    await runExtraction(base64, scanRawImage)
   }
 
   // ══════════════════════════════════════════════════════════
@@ -509,15 +602,13 @@ export default function SwatchStudio() {
     onStripTap()
   }
 
-  const hueCircleColor = hslHex(dHue, 72, 52)
-  const shadeCircleColor = hslHex(dHue, 70, dShade / 100 * 70 + 15)
-  const shadeTrackBg = `linear-gradient(to right, ${hslHex(dHue, 70, 15)}, ${hslHex(dHue, 75, 50)}, ${hslHex(dHue, 60, 82)})`
-
   // ══════════════════════════════════════════════════════════
   // RENDER
   // ══════════════════════════════════════════════════════════
   return (
-    <div className="app-shell">
+    <div className="app-shell"
+      onTouchStart={onSwipeTouchStart}
+      onTouchEnd={onSwipeTouchEnd}>
       {toast && <div className="toast-msg">{toast}</div>}
 
       {/* ── Header ── */}
@@ -550,7 +641,7 @@ export default function SwatchStudio() {
 
       {/* ── Tab bar ── */}
       <div className="tabs">
-        {['discover', 'browse', 'palettes', 'scanned'].map(id => (
+        {TABS.map(id => (
           <button key={id} data-t={id}
             className={`tab${activeTab === id ? ' on' : ''}`}
             onClick={() => setActiveTab(id)}>
@@ -563,9 +654,9 @@ export default function SwatchStudio() {
       <div className={`panel${activeTab === 'discover' ? ' on' : ''}`}>
         <div className="disc-hdr">
           <div className="mode-row">
-            <div style={{ display: 'flex' }}>
-              <button className={`mtab${dMode === 'all' ? ' on-all' : ''}`} onClick={() => setDMode('all')}>All</button>
-              <button className={`mtab${dMode === 'custom' ? ' on-cust' : ''}`} onClick={() => setDMode('custom')}>Custom</button>
+            <div className="disc-toggle">
+              <button className={`disc-topt${dMode === 'random' ? ' on' : ''}`} onClick={() => setDMode('random')}>Random</button>
+              <button className={`disc-topt${dMode === 'uniform' ? ' on' : ''}`} onClick={() => setDMode('uniform')}>Uniform</button>
             </div>
             <div className="zoom-grp">
               <div className="zoom-slrw">
@@ -577,72 +668,48 @@ export default function SwatchStudio() {
               <span className="zoom-lbl">{dZoom}×</span>
             </div>
           </div>
-
-          <div className="sliders-blk">
-            <div className="slr-row">
-              <span className="slr-lbl">Hue</span>
-              <div className="slrw">
-                <div className="slrt" style={{ background: 'linear-gradient(to right,hsl(0,85%,52%),hsl(45,90%,52%),hsl(90,80%,40%),hsl(150,78%,42%),hsl(200,85%,50%),hsl(260,80%,58%),hsl(300,78%,50%),hsl(340,85%,50%),hsl(360,85%,52%))' }} />
-                <div className="slrk" style={{ left: `${(dHue / 360) * 100}%`, background: hueCircleColor }} />
-                <input type="range" min="0" max="360" value={dHue} step="1"
-                  onChange={e => onHueChange(+e.target.value)} />
-              </div>
-              <div className="circ" style={{ background: hueCircleColor }} />
-            </div>
-            <div className="slr-row">
-              <span className="slr-lbl">Shade</span>
-              <div className="slrw">
-                <div className="slrt" style={{ background: shadeTrackBg }} />
-                <div className="slrk" style={{ left: `${((dShade - 15) / 70) * 100}%`, background: shadeCircleColor }} />
-                <input type="range" min="15" max="85" value={dShade} step="1"
-                  onChange={e => onShadeChange(+e.target.value)} />
-              </div>
-              <div className="circ" style={{ background: shadeCircleColor }} />
-            </div>
-          </div>
         </div>
 
-        {/* Picks grid — same size as library chips, 5 wide */}
-        <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--div)' }}>
+        {/* Picks bar */}
+        <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--div)', flexShrink: 0 }}>
           {dPicks.length === 0 ? (
-            <div style={{ padding: '6px 4px', fontSize: 10, color: 'var(--t2)' }}>Tap to pick · tap again to remove</div>
+            <div style={{ padding: '4px 4px', fontSize: 10, color: 'var(--t2)' }}>Tap to pick · tap again to remove</div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div className="cgrid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', flex: 1 }}>
                 {dPicks.map(hex => (
-                  <div key={hex} className="chip" style={{ background: hex }}
-                    onClick={() => togglePick(hex)}>
+                  <div key={hex} className="chip" style={{ background: hex }} onClick={() => togglePick(hex)}>
                     <div className="chex">{hex}</div>
                   </div>
                 ))}
               </div>
-              <button className="stp-icon" onClick={sendPicksToQueue} title="Send to Browse"
+              <button className="stp-icon" onClick={sendPicksToQueue} title="Send to Create"
                 style={{ whiteSpace: 'nowrap', width: 'auto', padding: '0 10px', fontSize: 12, fontWeight: 600, gap: 4 }}>
-                → Browse
+                → Create
               </button>
             </div>
           )}
         </div>
 
-        {/* Divider */}
         <div style={{ height: 3, background: 'var(--div2)', flexShrink: 0 }} />
 
-        <div className="grid-wrap">
+        <div className="grid-wrap" ref={discGridRef}>
           <div className="cgrid" style={{ gridTemplateColumns: `repeat(${dZoom}, 1fr)` }}>
             {dColors.map((hex, i) => (
               <div key={hex + i}
                 className={`chip${dPicks.includes(hex) ? ' sel' : ''}`}
                 style={{ background: hex }}
                 onClick={() => togglePick(hex)}>
-                <div className="chex">{hex}</div>
+                {dZoom <= 4 && <div className="chex">{hex}</div>}
               </div>
             ))}
           </div>
+          {dLoading && <div className="disc-loading">···</div>}
         </div>
       </div>
 
-      {/* ═══════════ BROWSE ═══════════ */}
-      <div className={`panel${activeTab === 'browse' ? ' on' : ''}`}>
+      {/* ═══════════ CREATE ═══════════ */}
+      <div className={`panel${activeTab === 'create' ? ' on' : ''}`}>
         <div className="brow-ctrl">
           {/* Row 1: Icon action buttons */}
           <div className="icon-row">
@@ -829,7 +896,7 @@ export default function SwatchStudio() {
                 </div>
                 <div className="picons">
                   <button className="pi" title="Load" style={{ color: '#6EC98A' }}
-                    onClick={() => { setQueue(p.colors.filter(h => !queue.includes(h))); setActiveTab('browse'); notify('Loaded into queue') }}>
+                    onClick={() => { setQueue(p.colors.filter(h => !queue.includes(h))); setActiveTab('create'); notify('Loaded into queue') }}>
                     <ArrowUpToLine size={14} />
                   </button>
                   <button className="pi" title="Copy" style={{ color: '#8CABFF' }}
@@ -851,22 +918,49 @@ export default function SwatchStudio() {
         </div>
       </div>
 
-      {/* ═══════════ SCANNED ═══════════ */}
-      <div className={`panel${activeTab === 'scanned' ? ' on' : ''}`}>
-        <div className="scan-ctrl">
-          <div className="scan-title">Upload or scan a photo to extract colors</div>
-          {/* Standard/Precise toggle */}
-          <div className="prec-toggle">
-            <button className={`prec-opt${scanMode === 'standard' ? ' on' : ''}`} onClick={() => setScanMode('standard')}>Standard</button>
-            <button className={`prec-opt${scanMode === 'precise' ? ' on' : ''}`} onClick={() => setScanMode('precise')}>Precise</button>
+      {/* ═══════════ SCAN ═══════════ */}
+      <div className={`panel${activeTab === 'scan' ? ' on' : ''}`}>
+
+        {/* Post-Processing Center */}
+        {scanPostMode && scanRawImage ? (
+          <div className="pp-center">
+            <div className="pp-image-wrap">
+              <img src={scanRawImage} alt="scan preview" className="pp-image"
+                style={{ filter: `brightness(${1 + ppBrightness/100}) saturate(${ppSaturation/100})` }} />
+            </div>
+            <div className="pp-sliders">
+              {[
+                { label: 'Blur', value: ppBlur, set: setPpBlur, min: 0, max: 20, step: 1 },
+                { label: 'Warmth', value: ppWarmth, set: setPpWarmth, min: -50, max: 50, step: 1 },
+                { label: 'Brightness', value: ppBrightness, set: setPpBrightness, min: -50, max: 50, step: 1 },
+                { label: 'Saturation', value: ppSaturation, set: setPpSaturation, min: 0, max: 200, step: 1 },
+              ].map(({ label, value, set, min, max, step }) => (
+                <div key={label} className="pp-row">
+                  <span className="pp-lbl">{label}</span>
+                  <input type="range" className="pp-slider" min={min} max={max} step={step} value={value}
+                    onChange={e => set(+e.target.value)} />
+                  <span className="pp-val">{value}</span>
+                </div>
+              ))}
+            </div>
+            <div className="pp-btns">
+              <button className="sbt" onClick={() => { setScanPostMode(false); setScanRawImage(null) }}>Re-shoot</button>
+              <button className="sbt primary" onClick={handleGeneratePalette} disabled={scanning}>
+                {scanning ? 'Extracting…' : 'Generate Palette'}
+              </button>
+            </div>
           </div>
-          <div className="scan-btns-row">
-            <button className="sbt primary" onClick={() => fileRef.current?.click()}>Upload photo</button>
-            <button className="sbt" onClick={() => cameraRef.current?.click()}>Open camera</button>
+        ) : (
+          <div className="scan-ctrl">
+            <div className="scan-title">Upload or scan a photo to extract colors</div>
+            <div className="scan-btns-row">
+              <button className="sbt primary" onClick={() => fileRef.current?.click()}>Upload photo</button>
+              <button className="sbt" onClick={() => cameraRef.current?.click()}>Open camera</button>
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleScanFile} />
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleScanFile} />
           </div>
-          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleScanFile} />
-          <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleScanFile} />
-        </div>
+        )}
 
         {/* Scan result */}
         {scanColors.length > 0 && (
@@ -897,7 +991,7 @@ export default function SwatchStudio() {
               <span className="wa-sep">·</span>
               <button className="wa wa-copy" onClick={() => {
                 setQueue(prev => [...prev, ...scanColors.map(c => c.hex).filter(h => !prev.includes(h))])
-                setActiveTab('browse')
+                setActiveTab('create')
                 notify('Colors in queue — tap ↑ to push')
               }}>Send to Queue</button>
               <span className="wa-sep">·</span>

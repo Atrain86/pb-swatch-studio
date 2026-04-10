@@ -7,7 +7,7 @@
   --a: #8CABFF;
   --div: rgba(255,255,255,0.13); --div2: rgba(255,255,255,0.24);
   --t: #ffffff; --t2: rgba(255,255,255,0.55); --t3: rgba(255,255,255,0.22);
-  --tc-d: #8CABFF; --tc-b: #6EC98A; --tc-p: #C060C0; --tc-s: #F07848;
+  --tc-d: #8CABFF; --tc-c: #6EC98A; --tc-p: #C060C0; --tc-s: #F07848;
   --ic1: #8CABFF; --ic2: #6EC98A; --ic3: #F07848; --ic4: #C060C0; --ic5: rgba(255,255,255,0.35);
 }
 
@@ -32,9 +32,9 @@ body { background: #1a1a2e; display: flex; justify-content: center; padding: 1re
 .tab { flex: 1; padding: 9px 4px; text-align: center; cursor: pointer; font-size: 12px; color: white; border: none; border-bottom: 2px solid transparent; transition: all .18s; font-weight: 500; background: none; font-family: inherit; opacity: .75; }
 .tab:hover { opacity: 1; }
 .tab.on[data-t=discover] { color: var(--tc-d); border-bottom-color: var(--tc-d); opacity: 1; }
-.tab.on[data-t=browse] { color: var(--tc-b); border-bottom-color: var(--tc-b); opacity: 1; }
+.tab.on[data-t=create]   { color: var(--tc-c); border-bottom-color: var(--tc-c); opacity: 1; }
 .tab.on[data-t=palettes] { color: var(--tc-p); border-bottom-color: var(--tc-p); opacity: 1; }
-.tab.on[data-t=scanned] { color: var(--tc-s); border-bottom-color: var(--tc-s); opacity: 1; }
+.tab.on[data-t=scan]     { color: var(--tc-s); border-bottom-color: var(--tc-s); opacity: 1; }
 
 .panel { display: none; flex: 1; overflow: hidden; flex-direction: column; }
 .panel.on { display: flex; }
@@ -49,6 +49,24 @@ body { background: #1a1a2e; display: flex; justify-content: center; padding: 1re
 /* ══ DISCOVER ══ */
 .disc-hdr { background: var(--bg2); border-bottom: 1px solid var(--div); flex-shrink: 0; }
 .mode-row { display: flex; align-items: flex-end; justify-content: space-between; padding: 0 10px; }
+/* Discover Random/Uniform toggle */
+.disc-toggle { display: flex; background: var(--bg3); border-radius: 7px; padding: 2px; gap: 2px; }
+.disc-topt { flex: 1; padding: 5px 10px; font-size: 11px; border-radius: 5px; border: none; background: none; color: var(--t2); cursor: pointer; font-family: inherit; font-weight: 500; transition: all .15s; }
+.disc-topt.on { background: var(--bg2); color: var(--tc-d); font-weight: 600; }
+.disc-loading { text-align: center; padding: 12px; font-size: 18px; color: var(--t2); letter-spacing: 4px; animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100% { opacity: .3 } 50% { opacity: 1 } }
+
+/* Post-processing center */
+.pp-center { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+.pp-image-wrap { flex: 0 0 55%; overflow: hidden; background: #000; display: flex; align-items: center; justify-content: center; }
+.pp-image { width: 100%; height: 100%; object-fit: contain; display: block; }
+.pp-sliders { padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; background: var(--bg2); border-top: 1px solid var(--div); }
+.pp-row { display: flex; align-items: center; gap: 8px; }
+.pp-lbl { font-size: 10px; color: var(--t2); font-weight: 600; letter-spacing: .04em; width: 62px; flex-shrink: 0; }
+.pp-slider { flex: 1; height: 3px; accent-color: var(--a); cursor: pointer; }
+.pp-val { font-size: 10px; color: var(--t2); width: 28px; text-align: right; font-variant-numeric: tabular-nums; }
+.pp-btns { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--div); flex-shrink: 0; }
+
 .mtab { padding: 7px 8px 6px; font-size: 11px; color: white; cursor: pointer; border: none; border-bottom: 2px solid transparent; transition: all .18s; font-weight: 500; background: none; font-family: inherit; opacity: .55; }
 .mtab:hover { opacity: .85; }
 .mtab.on-all { border-bottom-color: var(--tc-d); opacity: 1; }
@@ -110,7 +128,7 @@ body { background: #1a1a2e; display: flex; justify-content: center; padding: 1re
 @keyframes pp { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
 .push-btn:disabled { border-color: var(--t3); color: var(--t3); cursor: default; }
 .push-btn:disabled:hover { background: none; transform: none; }
-.gen-btn { background: none; border: none; border-left: 1px solid var(--div); font-family: inherit; font-size: 11px; cursor: pointer; color: var(--tc-b); font-weight: 700; padding: 2px 0 2px 10px; letter-spacing: .03em; white-space: nowrap; transition: color .15s; flex-shrink: 0; }
+.gen-btn { background: none; border: none; border-left: 1px solid var(--div); font-family: inherit; font-size: 11px; cursor: pointer; color: var(--tc-c); font-weight: 700; padding: 2px 0 2px 10px; letter-spacing: .03em; white-space: nowrap; transition: color .15s; flex-shrink: 0; }
 .gen-btn:hover { color: white; }
 .sch-area { display: none; padding: 5px 12px 5px; border-bottom: 1px solid var(--div); position: relative; }
 .sch-area.on { display: block; }
@@ -223,6 +241,4 @@ body { background: #1a1a2e; display: flex; justify-content: center; padding: 1re
 .toast-msg { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: var(--a); color: #000; padding: 5px 14px; border-radius: 14px; font-size: 11px; pointer-events: none; z-index: 99; white-space: nowrap; font-weight: 600; }
 
 /* ── Precision toggle ── */
-.prec-toggle { display: flex; gap: 0; margin-bottom: 10px; background: var(--bg3); border-radius: 7px; padding: 2px; justify-content: center; }
-.prec-opt { flex: 1; padding: 4px 0; text-align: center; font-size: 10px; border-radius: 5px; color: var(--t3); cursor: pointer; transition: all .12s; background: none; border: none; font-family: inherit; font-weight: 500; }
-.prec-opt.on { background: rgba(240,120,72,.12); color: var(--tc-s); }
+/* prec-toggle removed — replaced by pp-center flow */
