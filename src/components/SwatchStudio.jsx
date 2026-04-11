@@ -103,7 +103,7 @@ const LAB_COMBOS = [
   { c1: '#FFCC44', c2: '#F07848', c3: '#C060C0', c4: '#6EC98A', c5: 'rgba(255,255,255,.35)' },
 ]
 
-const APP_VERSION = '3.1.1'
+const APP_VERSION = '3.1.2'
 
 // ═════════════════════════════════════════════════════════════
 export default function SwatchStudio() {
@@ -164,31 +164,37 @@ export default function SwatchStudio() {
 
   function onZoomChange(v) { setDZoom(v) }
 
+  const dLoadingRef = useRef(false)
+  const dModeRef = useRef(dMode)
+  const dBatchOffsetRef = useRef(1)
+  useEffect(() => { dModeRef.current = dMode }, [dMode])
+
   function loadMoreColors() {
-    if (dLoading) return
+    if (dLoadingRef.current) return
+    dLoadingRef.current = true
     setDLoading(true)
     setTimeout(() => {
-      setDColors(prev => {
-        const next = dMode === 'random'
-          ? [...prev, ...genRandomBatch(40)]
-          : [...prev, ...genUniformBatch(dBatchOffset, 40)]
-        return next
-      })
-      setDBatchOffset(n => n + 1)
+      const nextOffset = dBatchOffsetRef.current
+      setDColors(prev => dModeRef.current === 'random'
+        ? [...prev, ...genRandomBatch(40)]
+        : [...prev, ...genUniformBatch(nextOffset, 40)]
+      )
+      dBatchOffsetRef.current = nextOffset + 1
+      dLoadingRef.current = false
       setDLoading(false)
     }, 80)
   }
 
-  // Scroll sentinel for endless scroll
+  // Scroll sentinel for endless scroll — use window scroll on mobile
   useEffect(() => {
     const el = discGridRef.current
     if (!el) return
     const onScroll = () => {
-      if (el.scrollHeight - el.scrollTop - el.clientHeight < 200) loadMoreColors()
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 300) loadMoreColors()
     }
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
-  })
+  }, []) // mount only — uses refs so closure is always fresh
 
   function togglePick(hex) {
     if (dPicks.includes(hex)) {
@@ -316,24 +322,41 @@ export default function SwatchStudio() {
 
   function genPalette(seeds, fid, rnd) {
     if (!seeds.length) return []
+    const TARGET = 5
+    const v = fid / 100  // 0 = tight/faithful, 1 = wild/free
+
+    // How many seed slots to lock in: high fidelity = lock all seeds (up to TARGET)
+    // Low fidelity = lock none, generate freely from seed centroid
+    const lockCount = Math.round(v * Math.min(seeds.length, TARGET))
+    const freeCount = TARGET - lockCount
+
+    // Pick which seeds to lock (evenly spaced through seed array for variety)
+    const locked = Array.from({ length: lockCount }, (_, i) => {
+      const idx = Math.floor((i / Math.max(lockCount, 1)) * seeds.length)
+      return seeds[idx]
+    })
+
+    // Compute LAB centroid of seeds for generating complementary free colors
     const labs = seeds.map(hexToLab)
     const cL = labs.reduce((s, v) => s + v[0], 0) / labs.length
     const cA = labs.reduce((s, v) => s + v[1], 0) / labs.length
     const cB = labs.reduce((s, v) => s + v[2], 0) / labs.length
-    const v = fid / 100, maxD = v * 72, retain = (1 - v) * 0.65
-    return Array.from({ length: 5 }, (_, i) => {
-      const t = i / 4
-      if (Math.random() < retain && seeds.length) {
-        const pick = seeds[Math.floor(sr(i * 3 + rnd * 17) * seeds.length)]
-        const [L, A, B] = hexToLab(pick)
-        const j = maxD * 0.28
-        return l2h(Math.max(12, Math.min(90, L + (sr(i * 5 + rnd) - 0.5) * j * 0.8)), A + (sr(i * 7 + rnd) - 0.5) * j, B + (sr(i * 11 + rnd) - 0.5) * j)
-      }
-      const ang = (t * 360 + rnd * 47) % 360, rad = ang * Math.PI / 180
-      const ch = 18 + v * 58 + sr(i * 3 + rnd) * v * 32
-      const nL = Math.max(14, Math.min(88, cL - 32 + t * 64 + (sr(i * 2 + rnd) - 0.5) * maxD * 0.5))
-      return l2h(nL, cA * (1 - v) + ch * Math.cos(rad) * v + (sr(i * 9 + rnd) - 0.5) * maxD * 0.4, cB * (1 - v) + ch * Math.sin(rad) * v + (sr(i * 13 + rnd) - 0.5) * maxD * 0.4)
+
+    // Generate free complementary colors
+    const spread = 20 + (1 - v) * 50  // tight fidelity = wide spread (more complementary)
+    const free = Array.from({ length: freeCount }, (_, i) => {
+      const ang = ((i / Math.max(freeCount, 1)) * 360 + rnd * 47 + 180) % 360
+      const rad = ang * Math.PI / 180
+      const ch = 25 + spread * 0.6 + sr(i * 3 + rnd) * spread * 0.4
+      const nL = Math.max(20, Math.min(85, cL - 25 + (i / Math.max(freeCount - 1, 1)) * 50 + (sr(i * 2 + rnd) - 0.5) * 20))
+      return l2h(nL, cA * v * 0.3 + ch * Math.cos(rad), cB * v * 0.3 + ch * Math.sin(rad))
     })
+
+    // Interleave locked seeds + free colors, sort by lightness for a natural palette order
+    const combined = [...locked, ...free]
+    const withL = combined.map(hex => { const [L] = hexToLab(hex); return { hex, L } })
+    withL.sort((a, b) => a.L - b.L)
+    return withL.map(c => c.hex)
   }
 
   function doGenerate() {
@@ -410,16 +433,21 @@ export default function SwatchStudio() {
   // ══════════════════════════════════════════════════════════
   // SCANNED STATE
   // ══════════════════════════════════════════════════════════
+  const [scanMode, setScanMode] = useState('single') // 'single' | 'multi'
   const [scanColors, setScanColors] = useState([])
   const [scanImage, setScanImage] = useState(null)
-  const [scanRawImage, setScanRawImage] = useState(null) // original before post-processing
+  const [scanRawImage, setScanRawImage] = useState(null)
   const [scanHistory, setScanHistory] = useState([])
   const [scanning, setScanning] = useState(false)
-  const [scanPostMode, setScanPostMode] = useState(false) // show post-processing center
+  const [scanPostMode, setScanPostMode] = useState(false)
   const [ppBlur, setPpBlur] = useState(4)
   const [ppWarmth, setPpWarmth] = useState(0)
   const [ppBrightness, setPpBrightness] = useState(0)
   const [ppSaturation, setPpSaturation] = useState(100)
+  const [pickedColor, setPickedColor] = useState(null) // color under finger
+  const [magnifierPos, setMagnifierPos] = useState(null) // {x, y} in image coords
+  const ppCanvasRef = useRef(null)
+  const ppImageRef = useRef(null)
   const fileRef = useRef(null)
   const cameraRef = useRef(null)
 
@@ -561,6 +589,46 @@ export default function SwatchStudio() {
     })
     const base64 = applyPostProcessing(img, ppBlur, ppWarmth, ppBrightness, ppSaturation)
     await runExtraction(base64, scanRawImage)
+  }
+
+  // ── Single mode color picker ──────────────────────────────
+  function getPixelFromTouch(e) {
+    const img = ppImageRef.current
+    if (!img) return null
+    const touch = e.touches?.[0] || e.changedTouches?.[0] || e
+    const rect = img.getBoundingClientRect()
+    const xRatio = (touch.clientX - rect.left) / rect.width
+    const yRatio = (touch.clientY - rect.top) / rect.height
+    // Draw raw image to offscreen canvas and sample pixel
+    const canvas = document.createElement('canvas')
+    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight
+    canvas.getContext('2d').drawImage(img, 0, 0)
+    const px = Math.floor(xRatio * img.naturalWidth)
+    const py = Math.floor(yRatio * img.naturalHeight)
+    const [r, g, b] = canvas.getContext('2d').getImageData(px, py, 1, 1).data
+    const hex = '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('').toUpperCase()
+    return { hex, x: touch.clientX - rect.left, y: touch.clientY - rect.top, xPct: xRatio, yPct: yRatio }
+  }
+
+  function onPickerMove(e) {
+    e.preventDefault()
+    const result = getPixelFromTouch(e)
+    if (!result) return
+    setPickedColor(result.hex)
+    setMagnifierPos({ x: result.x, y: result.y })
+  }
+
+  function onPickerEnd(e) {
+    const result = getPixelFromTouch(e)
+    if (result) setPickedColor(result.hex)
+    setMagnifierPos(null)
+  }
+
+  function confirmPickedColor() {
+    if (!pickedColor) return
+    setScanColors([{ hex: pickedColor, name: pickedColor, coverage: 'dominant' }])
+    setScanPostMode(false)
+    notify('Color picked!')
   }
 
   // ══════════════════════════════════════════════════════════
@@ -924,10 +992,29 @@ export default function SwatchStudio() {
         {/* Post-Processing Center */}
         {scanPostMode && scanRawImage ? (
           <div className="pp-center">
-            <div className="pp-image-wrap">
-              <img src={scanRawImage} alt="scan preview" className="pp-image"
-                style={{ filter: `blur(${ppBlur * 0.5}px) brightness(${1 + ppBrightness/100}) saturate(${ppSaturation/100}) sepia(${Math.max(0, ppWarmth) / 100}) hue-rotate(${ppWarmth < 0 ? ppWarmth * 0.5 : 0}deg)` }} />
+            {/* Image preview — with color picker in Single mode */}
+            <div className="pp-image-wrap" style={{ position: 'relative' }}>
+              <img ref={ppImageRef} src={scanRawImage} alt="scan preview" className="pp-image"
+                style={{ filter: `blur(${ppBlur * 0.5}px) brightness(${1 + ppBrightness/100}) saturate(${ppSaturation/100}) sepia(${Math.max(0, ppWarmth) / 100}) hue-rotate(${ppWarmth < 0 ? ppWarmth * 0.5 : 0}deg)` }}
+                onTouchMove={scanMode === 'single' ? onPickerMove : undefined}
+                onTouchEnd={scanMode === 'single' ? onPickerEnd : undefined} />
+              {/* Magnifier bubble */}
+              {scanMode === 'single' && magnifierPos && (
+                <div className="magnifier" style={{ left: magnifierPos.x, top: magnifierPos.y, background: pickedColor }} />
+              )}
             </div>
+
+            {/* Single mode: big color preview + confirm */}
+            {scanMode === 'single' && pickedColor && (
+              <div className="picker-preview" style={{ background: pickedColor }}>
+                <span className="picker-hex">{pickedColor}</span>
+                <button className="picker-confirm" onClick={confirmPickedColor}>Use this color</button>
+              </div>
+            )}
+            {scanMode === 'single' && !pickedColor && (
+              <div className="picker-hint">Drag your finger on the image to pick a color</div>
+            )}
+
             <div className="pp-sliders">
               {[
                 { label: 'Blur', value: ppBlur, set: setPpBlur, min: 0, max: 20, step: 1 },
@@ -944,15 +1031,28 @@ export default function SwatchStudio() {
               ))}
             </div>
             <div className="pp-btns">
-              <button className="sbt" onClick={() => { setScanPostMode(false); setScanRawImage(null) }}>Re-shoot</button>
-              <button className="sbt primary" onClick={handleGeneratePalette} disabled={scanning}>
-                {scanning ? 'Extracting…' : 'Generate Palette'}
-              </button>
+              <button className="sbt" onClick={() => { setScanPostMode(false); setScanRawImage(null); setPickedColor(null) }}>Re-shoot</button>
+              {scanMode === 'multi' && (
+                <button className="sbt primary" onClick={handleGeneratePalette} disabled={scanning}>
+                  {scanning ? 'Extracting…' : 'Generate Palette'}
+                </button>
+              )}
             </div>
           </div>
         ) : (
           <div className="scan-ctrl">
             <div className="scan-title">Upload or scan a photo to extract colors</div>
+            {/* Single / Multi toggle */}
+            <div className="scan-mode-toggle">
+              <button className={`scan-mopt${scanMode === 'single' ? ' on' : ''}`} onClick={() => setScanMode('single')}>
+                <span className="scan-mopt-title">Single</span>
+                <span className="scan-mopt-sub">Match one color exactly</span>
+              </button>
+              <button className={`scan-mopt${scanMode === 'multi' ? ' on' : ''}`} onClick={() => setScanMode('multi')}>
+                <span className="scan-mopt-title">Multi</span>
+                <span className="scan-mopt-sub">Extract a full palette</span>
+              </button>
+            </div>
             <div className="scan-btns-row">
               <button className="sbt primary" onClick={() => fileRef.current?.click()}>Upload photo</button>
               <button className="sbt" onClick={() => cameraRef.current?.click()}>Open camera</button>
