@@ -1,24 +1,9 @@
+# Plain static site: no build step. Netlify publishes this folder as-is.
 [build]
-  command = "npm run build"
-  publish = "dist"
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
-# No-cache on service worker and HTML so updates propagate immediately
-[[headers]]
-  for = "/sw.js"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
+  publish = "."
+  command = "echo 'Static site, nothing to build'"
 
 [[headers]]
-  for = "/index.html"
+  for = "/*"
   [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
-
-[[headers]]
-  for = "/registerSW.js"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
+    Cache-Control = "no-cache"
