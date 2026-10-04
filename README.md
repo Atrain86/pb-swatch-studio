@@ -10,7 +10,7 @@ Collect colors you love and turn them into beautiful palettes. A MyPoorBrain app
 - `sw.js`: retires the old Swatch Studio offline cache on devices that had it
 
 ## Deploy
-Netlify publishes this folder as-is on every push to `main` (see `netlify.toml`). No build step.
+Netlify publishes on every push to `main`. Its only build step copies the files into `dist/` (see `netlify.toml`). Nothing is compiled.
 
 ## Data
 Palettes are saved on each device (browser storage). Photos are stored on the device too.
