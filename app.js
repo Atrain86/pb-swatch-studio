@@ -71,7 +71,14 @@ put(o){MEM.set(o.id,o);if(!DB.db)return Promise.resolve(false);return new Promis
 all(){if(!DB.db)return Promise.resolve([]);return new Promise(res=>{try{const q=DB.st('readonly').getAll();q.onsuccess=()=>res(q.result||[]);q.onerror=()=>res([])}catch(e){res([])}})},
 clear(){MEM.clear();IMG.clear();if(DB.db)try{DB.st('readwrite').clear()}catch(e){}}};
 function photoImg(id){if(IMG.has(id))return IMG.get(id);const p=MEM.get(id);if(!p)return Promise.resolve(null);const pr=new Promise(res=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>res(null);im.src=p.data});IMG.set(id,pr);return pr}
-function setupBatch(){const H=deck(DIST.hue),Sa=deck(DIST.sat),Lu=deck(DIST.lum);return H.map((h,i)=>{const r=HUE[h];return hslHex(rnd(r[0],r[1]),rnd(...SAT[Sa[i]]),rnd(...LUM[Lu[i]]))})}
+/* Spacing: before showing a colour, compare it with what's already on screen and
+   redraw from the same slot if it's a near twin (keeps the balanced mix, stops repeats). */
+const GAP=9;
+function spaced(make,seen){let best=null,bd=-1;for(let t=0;t<40;t++){const x=make();const o=hexOk(x);let m=99;for(const s of seen){const d=dist(o,s);if(d<m){m=d;if(m<bd)break}}if(m>bd){bd=m;best=[x,o]}if(m>=GAP)break}seen.push(best[1]);return best[0]}
+/* Start here: Khroma's balanced deck (every batch gets a fair share of each hue,
+   strong to soft, light to dark), with spacing against everything already shown */
+function setupBatch(prev){const seen=(prev||S.pool).map(hexOk);const H=deck(DIST.hue),Sa=deck(DIST.sat),Lu=deck(DIST.lum);return H.map((h,i)=>{const r=HUE[h];return spaced(()=>hslHex(rnd(r[0],r[1]),rnd(...SAT[Sa[i]]),rnd(...LUM[Lu[i]])),seen)})}
+function fillPool(){S.pool=[];S.pool.push(...setupBatch());S.pool.push(...setupBatch())}
 function taste(o){if(!S.likes.length)return 1;let b=0;for(const l of S.likes){const v=Math.exp(-((dist(o,l)/11)**2));if(v>b)b=v}return b}
 const HARM=[180,150,210,120,240,30,330];
 function onePal(anc,f,N){const n=Math.max(N,anc.length);const lo=rnd(0.22,0.34),hi=rnd(0.86,0.95);const Ls=Array.from({length:n},(_,i)=>lo+(hi-lo)*i/(n-1));const A=anc.map(h=>({hex:h,c:hexLch(h)})).sort((x,y)=>x.c[0]-y.c[0]);const slot=new Array(n).fill(null);
@@ -131,9 +138,17 @@ function applyTheme(){const c=themeCols(S.theme.cols);const r=document.documentE
 const nt=S.navTheme;const n=nt==='white'?['#FFFFFF','#FFFFFF','#FFFFFF','#FFFFFF']:(nt&&nt.cols?themeCols(nt.cols):c);['--n1','--n2','--n3','--n4'].forEach((k,i)=>r.setProperty(k,n[i]))}
 
 /* Discover stream: taste-weighted random colours, optionally limited to hue families */
-function genHex(){const f=[...S.hues];if(!f.length)return hslHex(rnd(0,360),rnd(0.1,1),rnd(0.2,0.9));const k=famBy(pick(f));if(!k[2])return hslHex(rnd(0,360),rnd(0,0.09),rnd(0.12,0.95));return hslHex(rnd(k[2][0]+1,k[2][1]-1),rnd(0.18,1),rnd(0.18,0.9))}
+/* one colour from a balanced slot, honouring the hue filter */
+function slotHex(hk,sk,lk){const f=[...S.hues];if(f.length){const k=famBy(pick(f));if(!k[2])return hslHex(rnd(0,360),rnd(0,0.09),rnd(0.12,0.95));return hslHex(rnd(k[2][0]+1,k[2][1]-1),rnd(...(sk==='neutral'?SAT.pale:SAT[sk])),rnd(...LUM[lk]))}const r=HUE[hk];return hslHex(rnd(r[0],r[1]),rnd(...SAT[sk]),rnd(...LUM[lk]))}
 const sortCols=a=>S.sort==='hue'?a.map(h=>({h,k:famOf(h)*10+Lof(h)})).sort((x,y)=>x.k-y.k).map(x=>x.h):shuffle(a);
-function streamBatch(n){let thr=(100-S.variety)/100*0.85;const out=[];let g=0;while(out.length<n&&g<60000){g++;if(g%1200===0)thr*=0.8;const hex=genHex();const o=hexOk(hex);if(taste(o)<thr)continue;if(out.some(c=>dist(c.o,o)<5))continue;out.push({hex,o})}return sortCols(out.map(c=>c.hex))}
+/* Discover stream: the same balanced deck. My taste ↔ Variety sets the mix:
+   at the middle about 60% of slots go to the colour you'd most likely love (out of
+   a dozen tries), the rest are free exploration. Spacing stops repeats. */
+function streamBatch(n,prev){const seen=(prev||[]).slice(-300).map(hexOk);const out=[];const tasteShare=S.likes.length?clamp((100-S.variety)/100*1.0,0,0.95):0;
+while(out.length<n){const H=deck(DIST.hue),Sa=deck(DIST.sat),Lu=deck(DIST.lum);for(let i=0;i<H.length&&out.length<n;i++){
+if(Math.random()<tasteShare){let best=null,bs=-1,far=null,fd=-1;for(let t=0;t<60;t++){const x=slotHex(pick(Object.keys(HUE)),pick(Object.keys(SAT)),pick(Object.keys(LUM)));const o=hexOk(x);let m=99;for(const q of seen){const d=dist(o,q);if(d<m)m=d}if(m>=6){const sc=taste(o);if(sc>bs){bs=sc;best=[x,o]}}else if(m>fd){fd=m;far=[x,o]}}const w=best||far;seen.push(w[1]);out.push(w[0])}
+else out.push(spaced(()=>slotHex(H[i],Sa[i],Lu[i]),seen))}}
+return sortCols(out)}
 
 function renameCreator(v){v=(v||'').trim();if(!v){toast('Your source name can’t be empty');renderMain();return false}const old=S.creator;if(v===old)return true;if(old&&!S.names.includes(old))S.names.unshift(old);S.names=S.names.filter(n=>n!==v).slice(0,8);S.creator=v;const me=v.toLowerCase();S.saved.forEach(p=>{if(!p.mine&&p.source&&p.source.trim().toLowerCase()===me){p.mine=true;p.source=null}});persist();renderHeader();toast('Your palettes now show '+v);return true}
 const srcDatalist=()=>`<datalist id="srclist">${[...new Set([S.creator,...S.names])].map(n=>`<option value="${esc(n)}"></option>`).join('')}</datalist>`;
@@ -260,7 +275,7 @@ return top+`<div id="sgrid" style="display:grid;grid-template-columns:repeat(${S
 function paintStream(){const g=$('sgrid');if(g)g.innerHTML=S.stream.map(swc).join('')}
 let loading=false;
 function watchSentinel(){const s=$('sent');if(!s||!('IntersectionObserver' in window))return;io=new IntersectionObserver(es=>{if(es[0].isIntersecting)loadMore()},{rootMargin:'700px 0px'});io.observe(s)}
-function loadMore(){if(loading)return;loading=true;setTimeout(()=>{if(S.view==='discover'){if(S.setupOpen){const b=setupBatch();S.pool.push(...b);const g=$('setgrid');if(g)g.insertAdjacentHTML('beforeend',b.map(setupItem).join(''))}else{const b=streamBatch(40);S.stream.push(...b);const g=$('sgrid');if(g)g.insertAdjacentHTML('beforeend',b.map(swc).join(''))}}loading=false},30)}
+function loadMore(){if(loading)return;loading=true;setTimeout(()=>{if(S.view==='discover'){if(S.setupOpen){const b=setupBatch();S.pool.push(...b);const g=$('setgrid');if(g)g.insertAdjacentHTML('beforeend',b.map(setupItem).join(''))}else{const b=streamBatch(40,S.stream);S.stream.push(...b);const g=$('sgrid');if(g)g.insertAdjacentHTML('beforeend',b.map(swc).join(''))}}loading=false},30)}
 
 /* ---------- Palettes ---------- */
 function groupsFor(list){const mine=list.filter(isMine),other=list.filter(p=>!isMine(p));const keys=[...new Set([...mine.map(srcOf),...other.map(srcOf)])];return keys.map(k=>({key:'src:'+k,title:k,items:list.filter(p=>srcOf(p)===k)})).filter(g=>g.items.length)}
@@ -426,10 +441,10 @@ chooseclose:()=>{S.chooser=false;renderSheet2()},
 takephoto:()=>{S.chooser=false;renderSheet2();const c=$('cam');c.value='';c.click()},
 chooselib:()=>{S.chooser=false;renderSheet2();const f=$('file');f.value='';f.click()},
 /* Discover */
-starthere:()=>{S.setupOpen=true;if(!S.pool.length)S.pool=[...setupBatch(),...setupBatch()];renderMain();window.scrollTo(0,0)},
+starthere:()=>{S.setupOpen=true;if(!S.pool.length)fillPool();renderMain();window.scrollTo(0,0)},
 like:v=>{const i=S.likeHex.indexOf(v);if(i>=0)S.likeHex.splice(i,1);else S.likeHex.push(v);S.likes=S.likeHex.map(hexOk);persist();document.querySelectorAll(`#setgrid .sw[data-v="${v}"]`).forEach(el=>el.classList.toggle('sel',i<0));const b=$('sbar');if(b)b.innerHTML=setupBarHTML()},
 done50:()=>{const n=S.likeHex.length;S.setupOpen=false;S.stream=streamBatch(60);renderMain();window.scrollTo(0,0);toast(n>=50?'Discover now follows your taste':n?`${n} picks saved. Carry on any time from Start here.`:'Pick colors any time from Start here')},
-retake:()=>{S.setupOpen=true;if(!S.pool.length)S.pool=[...setupBatch(),...setupBatch()];go('discover')},
+retake:()=>{S.setupOpen=true;if(!S.pool.length)fillPool();go('discover')},
 hue:v=>{if(v==='all'){S.hues.clear();S.dd=null}else if(S.hues.has(v))S.hues.delete(v);else S.hues.add(v);persist();S.stream=streamBatch(60);renderMain()},
 sort:v=>{S.sort=v;S.dd=null;persist();S.stream=sortCols([...S.stream]);renderMain()},
 dd:v=>{S.dd=S.dd===v?null:v;renderMain()},
@@ -569,7 +584,7 @@ try{if(window.self!==window.top&&screen.height)document.documentElement.style.se
 renderResults();
 [['theme'],['navTheme']].forEach(([k])=>{const t=S[k];if(t&&t.cols){const m=THEMES.find(x=>x.name===t.name&&x.cols.slice(0,t.cols.length).join()===t.cols.join());if(m)S[k]=m}});
 applyTheme();
-S.pool=[...setupBatch(),...setupBatch()];S.stream=streamBatch(60);persist();render();
+fillPool();S.stream=streamBatch(60);persist();render();
 DB.open().then(()=>DB.all()).then(list=>{list.forEach(p=>MEM.set(p.id,p));if(['pal','library','settings'].includes(S.view))renderMain()});
 
 /* Clean up the old Swatch Studio service worker on phones that installed it. */
