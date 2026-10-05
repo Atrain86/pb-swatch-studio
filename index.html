@@ -21,9 +21,14 @@
 <body>
 <header class="hdr"><div class="hdr-in" id="hdr"></div></header>
 <main id="main"></main>
-<nav class="nav" aria-label="Main"><div class="nav-in" id="nav"></div></nav>
+<div class="results" id="results" hidden><div class="results-in" id="resin"></div></div>
+<div class="dock">
+  <div class="search"><div class="sbox"><svg class="mag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input type="search" id="q" placeholder="Search, or paste hex codes or a link" aria-label="Search palettes, or paste hex codes or a link" autocomplete="off" enterkeyhint="search"><div class="sact" id="sact"></div></div></div>
+  <nav aria-label="Main"><div class="nav-in" id="nav"></div></nav>
+</div>
 <input type="file" accept="image/*" id="file" style="position:absolute;opacity:0;width:1px;height:1px;left:-10px;top:0" aria-hidden="true" tabindex="-1">
 <input type="file" accept="image/*" capture="environment" id="cam" style="position:absolute;opacity:0;width:1px;height:1px;left:-10px;top:0" aria-hidden="true" tabindex="-1">
+<datalist id="taglist"></datalist>
 <div id="ov"></div><div id="ov2"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="app.js"></script>

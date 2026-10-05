@@ -54,7 +54,6 @@ share:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="
 reset:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v4h4"/></svg>',
 copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6A1.5 1.5 0 0 0 14 4.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg>'
 };
-const LOGO='<svg width="34" height="34" viewBox="0 0 34 34" aria-label="ColorShare logo" role="img"><rect x=".5" y=".5" width="33" height="33" rx="9" fill="#0E0E12" stroke="rgba(255,255,255,.14)"/><rect x="6.5" y="6.5" width="9.5" height="9.5" rx="2.8" fill="#471396"/><rect x="18" y="6.5" width="9.5" height="9.5" rx="2.8" fill="#8CABFF"/><rect x="6.5" y="18" width="9.5" height="9.5" rx="2.8" fill="#78B9B5"/><rect x="18" y="18" width="9.5" height="9.5" rx="2.8" fill="#FFCC00"/></svg>';
 const THEMES=[{name:'ColorShare',cols:['#8CABFF','#78B9B5','#B48CFF','#FFCC00']},{name:'Ember',cols:['#F78D60','#FFCC44','#FF9A76','#F0A8D0']},{name:'Lagoon',cols:['#90E0EF','#7FD1C3','#5BB8E8','#B9D9A8']},{name:'Orchid',cols:['#D58BD5','#F0A8D0','#B48CFF','#8CABFF']},{name:'Meadow',cols:['#A8C5A0','#E9D8A6','#8FD3B5','#F2C57C']}];
 
 const LSx={get(k){try{const v=localStorage.getItem(k);return v==null?undefined:JSON.parse(v)}catch(e){return undefined}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
@@ -63,16 +62,7 @@ const SAMPLE=[{name:'Fire and ember',colors:['#B12C00','#EB5B00','#F78D60','#FFC
 const IMPORTED=['Color Hunt','Pasted','Khroma','Coolors','Adobe Color'];
 const isMine=p=>!!p.mine;
 const AUTO_TAGS=['Custom','Discover','Generated','Created','Scanned','Pasted','Color Hunt'];
-const norm=arr=>{const cr=load('creator','');return arr.map(p=>{const q={...p,id:p.id||uid(),created:p.created||Date.now()};if(q.mine===undefined)q.mine=!q.imported&&!IMPORTED.includes(q.src);if(q.source===undefined)q.source=q.mine?null:(q.src||'Imported');q.tags=(q.tags||[]).filter(t=>!AUTO_TAGS.includes(t)&&t!==q.src&&t!==q.source&&t!==cr);return q})};
-const mineSrc=()=>S.creator||'Custom';
-const kindOf=p=>p.photoId?'Scanned':'Custom';
-const srcOf=p=>p.mine?(p.source||mineSrc()):(p.source||p.src||'Imported');
-const srcLine=p=>p.mine?((p.source||S.creator)?`${srcOf(p).toUpperCase()} · ${kindOf(p)}`:kindOf(p)):srcOf(p);
 function srcFromUrl(v){try{const u=new URL(v.trim());const h=u.hostname.replace(/^www\./,'');if(h.includes('colorhunt'))return'Color Hunt';if(h.includes('khroma'))return'Khroma';if(h.includes('coolors'))return'Coolors';if(h.includes('adobe'))return'Adobe Color';return h}catch(e){return'Pasted'}}
-function defaultTags(){return[]}
-const srcField=(val,ctx,mine)=>`<div class="row" style="margin-top:12px"><span class="slab">Source</span><input type="text" id="${ctx}src" value="${esc(val||'')}" placeholder="${esc(mine?mineSrc():'Source')}" aria-label="Source name" style="height:34px;font-size:14px"></div>`;
-const tagsHTML=(tags,ctx)=>`<div class="tagrow" style="margin-top:10px">${tags.map((t,i)=>`<span class="tagc">${esc(t)}<button class="x" data-a="tagdel" data-v="${ctx}:${i}" aria-label="Remove tag ${esc(t)}">${ICON.close}</button></span>`).join('')}<input type="text" class="taginput" id="${ctx}tag" placeholder="+ Add tag" aria-label="Add tag" enterkeyhint="done"></div>`;
-
 const MEM=new Map(),IMG=new Map();
 const DB={db:null,
 open(){return new Promise(res=>{try{const r=indexedDB.open('colorshare_proto',1);r.onupgradeneeded=()=>{r.result.createObjectStore('photos',{keyPath:'id'})};r.onsuccess=()=>{DB.db=r.result;res(true)};r.onerror=()=>res(false);r.onblocked=()=>res(false)}catch(e){res(false)}})},
@@ -81,19 +71,8 @@ put(o){MEM.set(o.id,o);if(!DB.db)return Promise.resolve(false);return new Promis
 all(){if(!DB.db)return Promise.resolve([]);return new Promise(res=>{try{const q=DB.st('readonly').getAll();q.onsuccess=()=>res(q.result||[]);q.onerror=()=>res([])}catch(e){res([])}})},
 clear(){MEM.clear();IMG.clear();if(DB.db)try{DB.st('readwrite').clear()}catch(e){}}};
 function photoImg(id){if(IMG.has(id))return IMG.get(id);const p=MEM.get(id);if(!p)return Promise.resolve(null);const pr=new Promise(res=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>res(null);im.src=p.data});IMG.set(id,pr);return pr}
-
-const S={view:'discover',prev:'discover',setup:load('setup',true),likeHex:load('likes',[]),likes:[],pool:[],stream:[],zoom:5,variety:40,draft:null,far:35,sugg:[],anchors:[],saved:norm(load('saved',SAMPLE)),collapsed:new Set(load('collapsed',[])),closedGroups:new Set(load('groups',[])),studio:null,confirm:null,chooser:false,theme:load('theme',THEMES[0]),navTheme:load('navTheme','match'),creator:load('creator',''),armed:null,menu:null,q:'',tagF:null,viewer:null,libF:'all'};
-S.likes=S.likeHex.map(hexOk);
-function persist(){const ok=LSx.set('cs4_saved',S.saved);LSx.set('cs4_setup',S.setup);LSx.set('cs4_likes',S.likeHex);LSx.set('cs4_collapsed',[...S.collapsed]);LSx.set('cs4_groups',[...S.closedGroups]);LSx.set('cs4_theme',S.theme);LSx.set('cs4_navTheme',S.navTheme);LSx.set('cs4_creator',S.creator);return ok}
-function applyTheme(){const c=S.theme.cols.map(readable);const r=document.documentElement.style;['--c1','--c2','--c3','--c4'].forEach((k,i)=>r.setProperty(k,c[i]||c[0]));r.setProperty('--acc',c[0]);r.setProperty('--edge',rgba(c[0],.3));r.setProperty('--glow',rgba(c[0],.35));
-const nt=S.navTheme;const n=nt==='white'?['#FFFFFF','#FFFFFF','#FFFFFF','#FFFFFF']:(nt&&nt.cols?nt.cols.map(readable):c);['--n1','--n2','--n3','--n4'].forEach((k,i)=>r.setProperty(k,n[i]||n[0]))}
-applyTheme();
-
 function setupBatch(){const H=deck(DIST.hue),Sa=deck(DIST.sat),Lu=deck(DIST.lum);return H.map((h,i)=>{const r=HUE[h];return hslHex(rnd(r[0],r[1]),rnd(...SAT[Sa[i]]),rnd(...LUM[Lu[i]]))})}
 function taste(o){if(!S.likes.length)return 1;let b=0;for(const l of S.likes){const v=Math.exp(-((dist(o,l)/11)**2));if(v>b)b=v}return b}
-function streamBatch(n){let thr=(100-S.variety)/100*0.85;const out=[];let g=0;while(out.length<n&&g<80000){g++;if(g%1500===0)thr*=0.85;const hex=hslHex(rnd(0,360),rnd(0.1,1),rnd(0.2,0.9));const o=hexOk(hex);if(taste(o)<thr)continue;if(out.some(c=>dist(c.o,o)<5))continue;out.push({hex,o})}
-return out.map(c=>{const[L,C,h]=hexLch(c.hex);return{hex:c.hex,key:(C<0.035?99:Math.floor(((h+15)%360)/30))*10+L}}).sort((a,b)=>a.key-b.key).map(c=>c.hex)}
-
 const HARM=[180,150,210,120,240,30,330];
 function onePal(anc,f,N){const n=Math.max(N,anc.length);const lo=rnd(0.22,0.34),hi=rnd(0.86,0.95);const Ls=Array.from({length:n},(_,i)=>lo+(hi-lo)*i/(n-1));const A=anc.map(h=>({hex:h,c:hexLch(h)})).sort((x,y)=>x.c[0]-y.c[0]);const slot=new Array(n).fill(null);
 for(const a of A){let bi=0,bd=9;Ls.forEach((L,i)=>{if(slot[i])return;const d=Math.abs(L-a.c[0]);if(d<bd){bd=d;bi=i}});slot[bi]=a;Ls[bi]=a.c[0]}
@@ -104,170 +83,245 @@ return out.sort((a,b)=>Lof(a.hex)-Lof(b.hex))}
 function buildSugg(){const anchors=S.anchors,f=S.far/100;const cs=[];for(let i=0;i<90;i++){let anc=anchors;if(anchors.length>=5)anc=shuffle([...anchors]).slice(0,3+Math.floor(Math.random()*3));const q=onePal(anc,f,5);const oks=q.map(c=>hexOk(c.hex));let md=99;for(let a=0;a<q.length;a++)for(let b=a+1;b<q.length;b++){if(!q[a].g&&!q[b].g)continue;md=Math.min(md,dist(oks[a],oks[b]))}if(md<7)continue;cs.push({p:q.map(c=>c.hex),oks,sc:oks.reduce((s,o)=>s+taste(o),0)/q.length+md/100+Math.random()*0.05})}
 cs.sort((a,b)=>b.sc-a.sc);const ch=[];for(const c of cs){if(ch.every(x=>x.p.join()!==c.p.join()&&x.oks.reduce((s,o,i)=>s+dist(o,c.oks[i]),0)/5>9))ch.push(c);if(ch.length===4)break}for(const c of cs){if(ch.length>=4)break;if(!ch.some(x=>x.p.join()===c.p.join()))ch.push(c)}
 const used=new Set();S.sugg=ch.map(c=>{let n=baseName(c.p);if(used.has(n)){const alt=altNames(c.p).find(a=>!used.has(a));n=alt||n+' '+['II','III','IV','V'][used.size%4]}used.add(n);return{colors:c.p,name:n}})}
-
-function renameCreator(v){const old=S.creator;if(v===old)return;S.saved.forEach(p=>{if(p.mine&&p.source&&old&&p.source===old)p.source=null});S.creator=v;persist();toast(v?'Your palettes now show '+v:'Source name cleared')}
 let tT;function toast(m,ms){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>t.classList.remove('show'),ms||2200)}
 function fallback(t,cb){const a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.position='absolute';a.style.left='-9999px';document.body.appendChild(a);a.select();a.setSelectionRange(0,t.length);let ok=false;try{ok=document.execCommand('copy')}catch(e){}a.remove();cb(ok)}
 function copy(t,msg){const d=ok=>toast(ok===false?'Copy blocked here':(msg||(t.length<=7?'Copied '+t:'Copied')));try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(()=>d(true),()=>fallback(t,d));return}}catch(e){}fallback(t,d)}
 const cssOf=(name,c)=>`/* ${name} · ColorShare */\n:root {\n${c.map((h,i)=>`  --color-${i+1}: ${h};`).join('\n')}\n}`;
 function sharePal(name,cols){const text=`${name}\n${cols.join('  ')}\nMade with ColorShare`;const fb=()=>copy(text,'Copied, ready to paste and share');try{if(navigator.share){navigator.share({title:name,text}).catch(e=>{if(!e||e.name!=='AbortError')fb()});return}}catch(e){}fb()}
 function arm(key){if(S.armed===key){S.armed=null;return true}S.armed=key;setTimeout(()=>{if(S.armed===key){S.armed=null;if(S.view==='pal'||S.view==='settings')renderMain()}},3000);return false}
-const snapRange=(id,val,left,right,label)=>`<div class="row"><span class="slab">${left}</span><div class="rng snap"><input type="range" id="${id}" min="-100" max="100" step="1" value="${val}" aria-label="${label}"></div><span class="slab r">${right}</span></div>`;
+
+/* ---------- prototype 8: state, sources, theme ---------- */
+const LOGO='<svg width="30" height="30" viewBox="0 0 34 34" aria-label="ColorShare logo" role="img"><rect x=".5" y=".5" width="33" height="33" rx="9" fill="#0E0E12" stroke="rgba(255,255,255,.14)"/><rect x="6.5" y="6.5" width="9.5" height="9.5" rx="2.8" fill="#471396"/><rect x="18" y="6.5" width="9.5" height="9.5" rx="2.8" fill="#8CABFF"/><rect x="6.5" y="18" width="9.5" height="9.5" rx="2.8" fill="#78B9B5"/><rect x="18" y="18" width="9.5" height="9.5" rx="2.8" fill="#FFCC00"/></svg>';
+const HEART_D='M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.3a4.3 4.3 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20z';
+Object.assign(ICON,{
+heart:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="${HEART_D}"/></svg>`,
+heartOn:`<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="${HEART_D}"/></svg>`
+});
+/* hue families for the Discover filter (HSL hue ranges, neutral = almost no saturation) */
+const FAM=[['red','Red',[-15,15],'#E5484D'],['orange','Orange',[15,40],'#F27A2E'],['yellow','Yellow',[40,68],'#F2C230'],['green','Green',[68,160],'#4CAF6A'],['teal','Teal',[160,195],'#2BB3A8'],['blue','Blue',[195,250],'#3D7BF2'],['purple','Purple',[250,290],'#8E5BE8'],['pink','Pink',[290,345],'#E055A8'],['neutral','Neutral',null,'#9A9AA5']];
+function famOf(h){const[hh,s,l]=hexHsl(h);if(s<0.1||l<0.07||l>0.96)return 8;const x=hh>=345?hh-360:hh;for(let i=0;i<8;i++){const r=FAM[i][2];if(x>=r[0]&&x<r[1])return i}return 0}
+
+const norm=arr=>arr.map(p=>{const q={...p,id:p.id||uid(),created:p.created||Date.now()};if(q.mine===undefined)q.mine=!q.imported&&!IMPORTED.includes(q.src);if(q.mine)q.source=null;else if(!q.source)q.source=q.src||'Imported';q.tags=(q.tags||[]).filter(t=>!AUTO_TAGS.includes(t)&&t!==q.src&&t!==q.source);return q});
+/* One source name per phone. Older versions let each palette carry its own, so
+   take the most common one as the name if none is set yet. */
+const RAW=load('saved',SAMPLE);
+function firstCreator(){const c=load('creator','');if(c)return c;const n=new Map(),spell=new Map();RAW.forEach(p=>{const mine=p.mine!==undefined?p.mine:!p.imported&&!IMPORTED.includes(p.src);if(mine&&p.source){const k=p.source.trim().toLowerCase();n.set(k,(n.get(k)||0)+1);if(!spell.has(k))spell.set(k,p.source.trim())}});let best='',bn=0;n.forEach((v,k)=>{if(v>bn){bn=v;best=spell.get(k)}});return best||'A-Frame'}
+const kindOf=p=>p.photoId?'Scanned':'Custom';
+const srcOf=p=>p.mine?S.creator:(p.source||p.src||'Imported');
+const srcLine=p=>p.mine?`${S.creator.toUpperCase()} · ${kindOf(p)}`:srcOf(p);
+const srcTagRow=(srcText,tags,ctx)=>`<div class="row" style="margin-top:12px"><span class="srcl sp" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(srcText)}</span><input type="text" class="taginput" id="${ctx}tag" list="taglist" placeholder="+ Add tag" aria-label="Add tag" enterkeyhint="done" autocomplete="off"></div>${tags.length?`<div class="tagrow" style="margin-top:8px">${tags.map((t,i)=>`<span class="tagc">${esc(t)}<button class="x" data-a="tagdel" data-v="${ctx}:${i}" aria-label="Remove tag ${esc(t)}">${ICON.close}</button></span>`).join('')}</div>`:''}`;
+
+const S={view:'discover',prev:'discover',setupOpen:false,likeHex:load('likes',[]),likes:[],pool:[],stream:[],zoom:load('zoom',5),variety:load('variety',40),hues:new Set(load('hues',[])),sort:load('sort','random'),draft:null,far:35,sugg:[],anchors:[],saved:norm(RAW),openPh:new Set(load('openph',[])),closedGroups:new Set(load('groups',[])),studio:null,confirm:null,chooser:false,mo:null,theme:load('theme',THEMES[0]),navTheme:load('navTheme','match'),navPick:false,creator:firstCreator(),names:load('names',[]),armed:null,menu:null,q:'',viewer:null,libF:'all',palMode:load('palMode','list'),cols:load('cols',3),renaming:null,editSrc:false,themeOpen:new Set(['cur','ncur'])};
+S.likes=S.likeHex.map(hexOk);
+/* imported palettes that carry your own name become yours; drop tags that just repeat your name */
+S.saved.forEach(p=>{const me=S.creator.toLowerCase();if(!p.mine&&p.source&&p.source.trim().toLowerCase()===me){p.mine=true;p.source=null}p.tags=p.tags.filter(t=>t.trim().toLowerCase()!==me)});
+function persist(){const ok=LSx.set('cs4_saved',S.saved);const o={likes:S.likeHex,openph:[...S.openPh],groups:[...S.closedGroups],theme:S.theme,navTheme:S.navTheme,creator:S.creator,names:S.names,hues:[...S.hues],sort:S.sort,palMode:S.palMode,cols:S.cols,zoom:S.zoom,variety:S.variety};for(const k in o)LSx.set('cs4_'+k,o[k]);return ok}
+
+/* Theme colours: the four most different readable colours in a palette, nudged apart
+   if two still look alike, so every bottom bar icon gets its own colour. */
+function pickDiverse(cols,n){cols=[...new Set(cols.filter(Boolean))];if(!cols.length)cols=['#8CABFF'];const ok=cols.map(hexOk),ch=cols.map(h=>hexLch(h)[1]);const sel=[ch.indexOf(Math.max(...ch))];while(sel.length<Math.min(n,cols.length)){let bi=-1,bd=-1;cols.forEach((_,i)=>{if(sel.includes(i))return;const d=Math.min(...sel.map(j=>dist(ok[i],ok[j])))+ch[i]*40;if(d>bd){bd=d;bi=i}});sel.push(bi)}return sel.map(i=>cols[i])}
+function themeCols(cols){const cur=THEMES.find(t=>t.cols.join()===(cols||[]).join());if(cur)return cur.cols.map(readable);const c=pickDiverse((cols||[]).map(readable),4);while(c.length<4){const[L,C,h]=hexLch(c[c.length-1]);c.push(readable(lchHex(L,Math.max(C,0.1),h+90)))}
+for(let i=1;i<4;i++){let g=0;while(g<6&&c.slice(0,i).some(x=>dist(hexOk(x),hexOk(c[i]))<14)){const[L,C,h]=hexLch(c[i]);c[i]=readable(lchHex(L,Math.max(C,0.1),h+60));g++}}return c}
+function applyTheme(){const c=themeCols(S.theme.cols);const r=document.documentElement.style;['--c1','--c2','--c3','--c4'].forEach((k,i)=>r.setProperty(k,c[i]));r.setProperty('--acc',c[0]);r.setProperty('--edge',rgba(c[0],.3));r.setProperty('--glow',rgba(c[0],.3));
+const nt=S.navTheme;const n=nt==='white'?['#FFFFFF','#FFFFFF','#FFFFFF','#FFFFFF']:(nt&&nt.cols?themeCols(nt.cols):c);['--n1','--n2','--n3','--n4'].forEach((k,i)=>r.setProperty(k,n[i]))}
+
+/* Discover stream: taste-weighted random colours, optionally limited to hue families */
+function genHex(){const f=[...S.hues];if(!f.length)return hslHex(rnd(0,360),rnd(0.1,1),rnd(0.2,0.9));const k=FAM.find(x=>x[0]===pick(f));if(!k[2])return hslHex(rnd(0,360),rnd(0,0.09),rnd(0.12,0.95));return hslHex(rnd(k[2][0]+1,k[2][1]-1),rnd(0.18,1),rnd(0.18,0.9))}
+const sortCols=a=>S.sort==='hue'?a.map(h=>({h,k:famOf(h)*10+Lof(h)})).sort((x,y)=>x.k-y.k).map(x=>x.h):shuffle(a);
+function streamBatch(n){let thr=(100-S.variety)/100*0.85;const out=[];let g=0;while(out.length<n&&g<60000){g++;if(g%1200===0)thr*=0.8;const hex=genHex();const o=hexOk(hex);if(taste(o)<thr)continue;if(out.some(c=>dist(c.o,o)<5))continue;out.push({hex,o})}return sortCols(out.map(c=>c.hex))}
+
+function renameCreator(v){v=(v||'').trim();if(!v){toast('Your source name can’t be empty');renderMain();return false}const old=S.creator;if(v===old)return true;if(old&&!S.names.includes(old))S.names.unshift(old);S.names=S.names.filter(n=>n!==v).slice(0,8);S.creator=v;const me=v.toLowerCase();S.saved.forEach(p=>{if(!p.mine&&p.source&&p.source.trim().toLowerCase()===me){p.mine=true;p.source=null}});persist();renderHeader();toast('Your palettes now show '+v);return true}
+const srcDatalist=()=>`<datalist id="srclist">${[...new Set([S.creator,...S.names])].map(n=>`<option value="${esc(n)}"></option>`).join('')}</datalist>`;
+function allTags(){const c=new Map();S.saved.forEach(p=>(p.tags||[]).forEach(t=>c.set(t,(c.get(t)||0)+1)));return[...c.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0])}
+function fillTaglist(){const d=$('taglist');if(d)d.innerHTML=allTags().map(t=>`<option value="${esc(t)}"></option>`).join('')}
+
+/* ---------- search and paste (the bar above the bottom nav) ---------- */
+function matchQ(p,q){const hay=[p.name,srcOf(p),srcLine(p),kindOf(p),p.src||'',...(p.tags||[]),...p.colors].join(' ').toLowerCase();return q.toLowerCase().split(/\s+/).filter(Boolean).every(w=>hay.includes(w.replace(/^#/,'')))}
+const qList=()=>{const q=S.q.trim();return q?S.saved.filter(p=>matchQ(p,q)):[]};
+function parsePaste(v){v=(v||'').trim();if(!v)return null;const isUrl=/^https?:\/\//i.test(v);let raw;if(isUrl)raw=(v.includes('/palette/')?(v.split('/palette/')[1]||''):v.replace(/^https?:\/\/[^/]+/i,'')).match(/[0-9a-fA-F]{6}/g);else raw=v.match(/(?:#|\b)[0-9a-fA-F]{6}\b/g);
+const cols=[...new Set((raw||[]).map(h=>'#'+h.replace('#','').toUpperCase()))].slice(0,12);if(isUrl&&cols.length<2)return{err:'No colors found in that link. Try copying the hex codes instead.'};if(!isUrl&&!(cols.length>=2||(cols.length===1&&v.startsWith('#'))))return null;return{cols,url:isUrl?v:null,src:isUrl?srcFromUrl(v):null}}
+const rrow=p=>`<button class="rrow" data-a="view" data-v="${p.id}" data-ctx="q"><span class="rmini">${p.colors.map(h=>`<div style="background:${h}"></div>`).join('')}</span><span style="min-width:0;flex:1"><span style="display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</span><span style="display:block;font-size:11px;font-weight:600;letter-spacing:.03em;color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(srcLine(p))}${(p.tags||[]).length?' · '+p.tags.map(esc).join(', '):''}</span></span></button>`;
+function renderResults(){const q=S.q.trim();const box=$('results');const pp=parsePaste(q);
+$('sact').innerHTML=(pp&&pp.cols?`<button class="btn sm pri" data-a="addpaste">Add</button>`:'')+(q?`<button class="btn sm ghost icon" data-a="qclear" aria-label="Clear search">${ICON.close}</button>`:'');
+if(!q){box.hidden=true;return}const list=qList();box.hidden=false;
+const head=pp?(pp.err?`<div class="lbl" style="color:var(--danger);padding:6px 4px 10px">${esc(pp.err)}</div>`:`<div class="rrow" style="cursor:default"><span class="rmini">${pp.cols.map(h=>`<div style="background:${h}"></div>`).join('')}</span><span class="lbl" style="flex:1">Tap <b style="color:var(--fg)">Add</b> to save ${pp.cols.length} color${pp.cols.length===1?'':'s'} as a palette${pp.src?' from '+esc(pp.src):''}</span></div>`):'';
+$('resin').innerHTML=head+(list.length?`<div class="lbl" style="padding:4px 4px 2px">${list.length} palette${list.length===1?'':'s'}</div>`+list.map(rrow).join(''):(pp?'':'<div class="lbl" style="padding:10px 4px">No palettes match. Search by name, source, tag or hex code.</div>'))}
+function clearSearch(){S.q='';const i=$('q');if(i)i.value='';renderResults()}
+
+/* ---------- slide bars ----------
+   trk: a value bar. Touch anywhere and slide; the knob jumps to your finger.
+   rel: a nudge bar for fine colour changes. Slide from wherever you touch. */
+const TRK={
+tl:{get:()=>(1-S.draft.light)/2,set:f=>{S.draft.light=1-2*f;repaintStrip()}},
+tb:{get:()=>(S.draft.bold+1)/2,set:f=>{S.draft.bold=2*f-1;repaintStrip()}},
+stl:{get:()=>(1-S.studio.light)/2,set:f=>{S.studio.light=1-2*f;repaintStudioTones()}},
+stb:{get:()=>(S.studio.bold+1)/2,set:f=>{S.studio.bold=2*f-1;repaintStudioTones()}},
+stk:{get:()=>(S.studio.k-3)/9,set:(f,pad)=>{const k=Math.round(3+9*f);if(k!==S.studio.k){S.studio.k=k;const n=pad.querySelector('.pnum');if(n)n.textContent=k;runExtract(120)}}},
+variety:{get:()=>S.variety/100,set:f=>{S.variety=Math.round(f*100)},end:()=>{persist();S.stream=streamBatch(60);paintStream()}},
+zoom:{get:()=>(9-S.zoom)/6,set:f=>{const z=Math.round(9-6*f);if(z!==S.zoom){S.zoom=z;const g=$('sgrid');if(g)g.style.gridTemplateColumns=`repeat(${z},minmax(0,1fr))`}},end:()=>persist()},
+far:{get:()=>S.far/100,set:f=>{S.far=Math.round(f*100)},end:()=>{buildSugg();renderMain()}}
+};
+const trk=(id,left,right,o={})=>{const f=clamp(TRK[id].get(),0,1);return`<div class="pad trk" data-trk="${id}" role="slider" aria-label="${esc(left)} or ${esc(right)}"><span>${left}</span>${o.mid?'<span class="pmid"></span>':''}${o.num!=null?`<span class="pnum">${o.num}</span>`:''}<span class="knob" style="left:calc(14px + ${f.toFixed(4)} * (100% - 28px))"></span><span>${right}</span></div>`};
+const relPad=(g,k,left,right)=>`<div class="pad rel" data-rel="${g}:${k}" role="slider" aria-label="${left} or ${right}"><span>${left}</span><span class="knob"></span><span>${right}</span></div>`;
+const relPads=g=>relPad(g,'L','Lighter','Darker')+relPad(g,'W','Cooler','Warmer')+relPad(g,'C','Less color','More color');
+function relAdj(k,b,dx){let L=b.L,C=b.C,h=b.h;
+if(k==='L')L=clamp(b.L-dx*0.0008,0.06,0.98);
+if(k==='W'){const steps=dx*0.12;const t=steps>0?60:250;const d=((t-b.h+540)%360)-180;h=b.h+Math.sign(d)*Math.min(Math.abs(d),Math.abs(steps));C=b.C<0.02?b.C+Math.min(0.03,Math.abs(dx)*0.0002):b.C}
+if(k==='C')C=Math.max(0,b.C+dx*0.0004);return{L,C,h}}
+const curMatch=()=>(S.studio&&S.studio.match)||(S.mo&&S.mo.m)||null;
+const REL={
+m:{get:()=>curMatch(),set:v=>{Object.assign(curMatch(),v);paintMatch()}},
+a:{get:()=>{const d=S.draft;if(!d||d.sel==null||!d.base[d.sel])return null;const[L,C,h]=hexLch(d.base[d.sel]);return{L,C,h}},set:v=>{const d=S.draft;d.base[d.sel]=lchHex(v.L,v.C,v.h);repaintStrip()}}
+};
+let PD=null,lastTouch=0;
+function padDown(x,el){const pad=el&&el.closest&&el.closest('.pad');if(!pad)return false;const r=pad.getBoundingClientRect();
+if(pad.dataset.trk){const T=TRK[pad.dataset.trk];if(!T)return false;PD={pad,r,trk:T}}
+else if(pad.dataset.rel){const[g,k]=pad.dataset.rel.split(':');const R=REL[g];const o=R&&R.get();if(!o)return false;PD={pad,r,rel:R,k,x0:x,base:{L:o.L,C:o.C,h:o.h}}}else return false;
+pad.classList.add('act');padMove(x);return true}
+function padMove(x){if(!PD)return;const{pad,r}=PD;const kn=pad.querySelector('.knob');
+if(PD.trk){const f=clamp((x-r.left-14)/(r.width-28),0,1);if(kn)kn.style.left=`calc(14px + ${f.toFixed(4)} * (100% - 28px))`;PD.trk.set(f,pad)}
+else{if(kn)kn.style.left=clamp(x-r.left,8,r.width-8)+'px';PD.rel.set(relAdj(PD.k,PD.base,x-PD.x0))}}
+function padUp(){if(!PD)return;const p=PD;PD=null;p.pad.classList.remove('act');if(p.trk&&p.trk.end)p.trk.end()}
+
+/* Match to surface: a compact preview bar, tap the chevron for a big swatch */
+const ink=h=>Lof(h)>0.66?'#111':'#fff';
+function matchPrev(m){const adj=lchHex(m.L,m.C,m.h);return`<div id="msw" class="mbar${m.big?' big':''}" style="background:${adj}"><span class="mfrom" style="background:${m.orig}" title="Starting color"></span><span class="mono" id="mhex" style="color:${ink(adj)};font-size:13px">${adj}</span><span class="sp"></span><button class="mchev" data-a="mbig" aria-label="${m.big?'Smaller':'Bigger'} preview" aria-expanded="${!!m.big}"><span style="display:inline-flex;transform:rotate(${m.big?180:0}deg)">${ICON.chev}</span></button></div>`}
+function paintMatch(){const m=curMatch();if(!m)return;const adj=lchHex(m.L,m.C,m.h);const el=$('msw');if(el)el.style.background=adj;const t=$('mhex');if(t){t.textContent=adj;t.style.color=ink(adj)}}
 
 /* ---------- draft: one editor used everywhere ---------- */
 const draftCols=()=>S.draft?tone(S.draft.base,S.draft.light,S.draft.bold):[];
 const autoName=()=>baseName(draftCols());
 const draftName=()=>{const el=$('dname');const typed=el?el.value.trim():(S.draft.named?S.draft.name:'');return typed||autoName()};
-function snapDraft(){S.draft.orig=JSON.stringify({base:S.draft.base,light:S.draft.light,bold:S.draft.bold,name:S.draft.name,named:S.draft.named,tags:S.draft.tags,source:S.draft.source})}
-function newDraft(src){S.draft={id:null,base:[],light:0,bold:0,name:'',named:false,src:src||'Created',tags:[],source:null,mine:true};snapDraft()}
-function addToDraft(hex){if(!S.draft)newDraft('Discover');const b=S.draft.base;const i=b.indexOf(hex);if(i>=0){b.splice(i,1);return refreshDraft()}if(b.length>=12){toast('A palette holds up to 12 colors');return}const L=Lof(hex);let j=b.findIndex(c=>Lof(c)>L);if(j<0)j=b.length;b.splice(j,0,hex);refreshDraft()}
-function draftHTML(mode){const d=S.draft,cols=draftCols(),n=cols.length,editing=!!d.id;const inDisc=mode==='disc';
-const chips=n?cols.map((h,i)=>`<div class="chip" data-chip="${i}" style="background:${h}"></div>`).join(''):`<div class="empty">Tap colors to add them</div>`;
+function snapDraft(){S.draft.orig=JSON.stringify({base:S.draft.base,light:S.draft.light,bold:S.draft.bold,name:S.draft.name,named:S.draft.named,tags:S.draft.tags})}
+function newDraft(src){S.draft={id:null,base:[],light:0,bold:0,name:'',named:false,src:src||'Created',tags:[],source:null,mine:true,sel:null};snapDraft()}
+function addToDraft(hex){if(!S.draft)newDraft('Discover');const b=S.draft.base;const i=b.indexOf(hex);if(i>=0){b.splice(i,1);S.draft.sel=null;return refreshDraft()}if(b.length>=12){toast('A palette holds up to 12 colors');return}const L=Lof(hex);let j=b.findIndex(c=>Lof(c)>L);if(j<0)j=b.length;b.splice(j,0,hex);S.draft.sel=null;refreshDraft()}
+const draftSrc=d=>d.mine!==false?`${S.creator.toUpperCase()} · Custom`:(d.source||'Imported');
+function draftHTML(mode){const d=S.draft,cols=draftCols(),n=cols.length,editing=!!d.id;const inDisc=mode==='disc';if(d.sel!=null&&d.sel>=n)d.sel=null;
+const chips=n?cols.map((h,i)=>`<div class="chip${d.sel===i?' sel':''}" data-chip="${i}" style="background:${h}"></div>`).join(''):`<div class="empty">${inDisc?'Tap colors below to add them':'Add colors from Discover'}</div>`;
 const tag=editing?'Editing':(inDisc?'':'New palette');
-return `${tag?`<div class="lbl" style="margin-bottom:4px">${tag}</div>`:''}<div class="row"><input type="text" class="name" id="dname" value="${esc(d.named?d.name:'')}" placeholder="${esc(n?autoName():'Name your palette')}" aria-label="Palette name"><button class="btn sm ghost" data-a="autoname" title="Use the suggested name">Auto</button><button class="btn sm ghost" data-a="clearall" style="color:${S.armed==='clear'?'var(--danger)':'var(--fg2)'}">${S.armed==='clear'?'Tap again':'Clear all'}</button></div>
-<div class="strip" id="strip" style="margin-top:8px">${chips}</div><div class="row" style="margin-top:6px;min-height:16px"><span class="lbl sp">${n?'Tap to remove · hold and drag to reorder':''}</span><span class="lbl">${n}/12</span></div>
-${inDisc?'':`<div style="margin-top:10px">${snapRange('tl',Math.round(d.light*100),'Darker','Lighter','Lighter or darker')}<div style="height:6px"></div>${snapRange('tb',Math.round(d.bold*100),'Softer','Bolder','Softer or bolder')}</div>${srcField(d.source,'d',d.mine!==false)}${tagsHTML(d.tags||[],'d')}`}
-<div class="row" style="margin-top:12px;gap:8px;align-items:flex-end"><div class="row wrap sp center" style="gap:8px"><button class="btn sm" data-a="build">${ICON.spark}Build palettes</button>${inDisc?'':'<button class="btn sm" data-a="adddisc">Add from Discover</button>'}</div><div style="display:flex;flex-direction:column;gap:6px"><button class="btn sm icon" data-a="resetdraft" aria-label="Reset to how it was" title="Reset">${ICON.reset}</button><button class="btn sm icon" data-a="sharedraft" aria-label="Share palette">${ICON.share}</button></div></div>
+const adj=d.sel!=null?`<div class="adj"><div class="row" style="margin-bottom:8px"><span class="lbl">Adjust this color</span><span class="mono sp" id="selhex" style="color:var(--fg)">${cols[d.sel]}</span><button class="btn sm warn" data-a="chipdel">Remove</button><button class="btn sm" data-a="chipdone">Done</button></div>${relPads('a')}</div>`:'';
+return `${tag?`<div class="lbl" style="margin-bottom:4px">${tag}</div>`:''}<div class="row"><input type="text" class="name" id="dname" value="${esc(d.named?d.name:'')}" placeholder="${esc(n?autoName():'Name your palette')}" aria-label="Palette name" autocomplete="off"><button class="btn sm ghost" data-a="autoname" title="Use the suggested name">Auto</button><button class="btn sm ghost" data-a="clearall" style="color:${S.armed==='clear'?'var(--danger)':'var(--fg2)'}">${S.armed==='clear'?'Tap again':'Clear all'}</button></div>
+<div class="strip" id="strip" style="margin-top:8px">${chips}</div><div class="row" style="margin-top:6px;min-height:16px"><span class="lbl sp">${n?(d.sel!=null?'Slide the bars to change this color':'Tap a color to adjust it · hold and drag to reorder'):''}</span><span class="lbl">${n}/12</span></div>${adj}
+${inDisc?'':`<div style="margin-top:12px">${trk('tl','Lighter','Darker',{mid:1})}${trk('tb','Softer','Bolder',{mid:1})}</div>${srcTagRow(draftSrc(d),d.tags||[],'d')}`}
+<div class="row" style="margin-top:12px;gap:8px;align-items:flex-end"><div class="row wrap sp center" style="gap:8px"><button class="btn sm" data-a="build">${ICON.spark}Build palettes</button>${inDisc?'':'<button class="btn sm" data-a="adddisc">Add from Discover</button>'}</div><div style="display:flex;flex-direction:column;gap:8px"><button class="btn icon round" data-a="resetdraft" aria-label="Reset to how it was" title="Reset to how it was">${ICON.reset}</button><button class="btn icon round" data-a="sharedraft" aria-label="Share palette">${ICON.share}</button></div></div>
 <div class="row" style="margin-top:12px"><button class="btn big ghost" data-a="cancel">Cancel</button><button class="btn big pri" style="flex:1" data-a="${editing?'done':'savenew'}">${editing?'Done':'Save palette'}</button></div>`}
-function refreshDraft(){const hosts=document.querySelectorAll('[data-host=draft]');if(!S.draft||!hosts.length){renderMain();return}const nm=$('dname');const typed=nm?nm.value:'';if(nm&&typed.trim()){S.draft.name=typed;S.draft.named=true}hosts.forEach(h=>h.innerHTML=draftHTML(h.dataset.mode));if(S.view==='discover'&&!S.setup)updateChecks()}
-function repaintStrip(){const st=$('strip');if(!st||!S.draft)return;const cols=draftCols();[...st.children].forEach((c,i)=>{if(cols[i])c.style.background=cols[i]});const nm=$('dname');if(nm)nm.placeholder=autoName()}
+function refreshDraft(){const hosts=document.querySelectorAll('[data-host=draft]');if(!S.draft||!hosts.length){renderMain();return}const nm=$('dname');const typed=nm?nm.value:'';if(nm&&typed.trim()){S.draft.name=typed;S.draft.named=true}hosts.forEach(h=>h.innerHTML=draftHTML(h.dataset.mode));if(S.view==='discover'&&!S.setupOpen)updateChecks()}
+function repaintStrip(){const st=$('strip');if(!st||!S.draft)return;const cols=draftCols();[...st.children].forEach((c,i)=>{if(cols[i])c.style.background=cols[i]});const nm=$('dname');if(nm)nm.placeholder=autoName()||'Name your palette';const sh=$('selhex');if(sh&&S.draft.sel!=null)sh.textContent=cols[S.draft.sel]}
 function updateChecks(){const set=new Set(S.draft?S.draft.base:[]);document.querySelectorAll('#sgrid .sw').forEach(el=>{const on=set.has(el.dataset.v);if(on&&!el.firstChild)el.innerHTML=`<span class="ck">${ICON.check}</span>`;else if(!on&&el.firstChild)el.innerHTML=''})}
 
-/* ---------- render ---------- */
-function renderHeader(){const h=$('hdr');if(S.view==='build'){h.innerHTML=`<button class="btn sm ghost" data-a="back" aria-label="Back" style="padding:0 6px">${ICON.back}</button><span class="h2">Build palettes</span>`;return}h.innerHTML=`${LOGO}<span class="word">ColorShare</span><span class="sp"></span><span class="lbl">prototype 7</span>`}
-function renderNav(){const v=S.view==='build'?S.prev:S.view;const nb=(k,icon,label,c)=>`<button class="nb${v===k?' on':''}" style="--tc:${c}" data-a="go" data-v="${k}" aria-label="${label}">${ICON[icon]}<span>${label}</span></button>`;$('nav').innerHTML=nb('discover','discover','Discover','var(--n1)')+nb('pal','palettes','Palettes','var(--n2)')+`<button class="scanbtn" data-a="scan" aria-label="Scan a photo">${ICON.scan}</button>`+nb('library','library','Library','var(--n4)')+nb('settings','settings','Settings','#fff')}
+/* ---------- header, nav, main ---------- */
+function titleFor(){return{discover:'Discover',pal:'Palettes',library:`${S.creator}’s Library`,settings:'Settings'}[S.view]||''}
+function renderHeader(){const h=$('hdr');const logo=`<div class="hlogo">${LOGO}<small>prototype 8</small></div>`;
+if(S.view==='build'){h.innerHTML=`<button class="btn sm ghost icon" data-a="back" aria-label="Back" style="margin-left:-8px">${ICON.back}</button><span class="htitle">Build palettes</span>${logo}`;return}
+h.innerHTML=(S.view==='library'?`<button class="htitle" data-a="editsrc" aria-label="Change your source name">${esc(titleFor())}</button>`:`<span class="htitle">${esc(titleFor())}</span>`)+logo}
+function navButtons(v,preview){const nb=(k,icon,label,c)=>`<${preview?'span':'button'} class="nb${v===k?' on':''}" style="--tc:${c}" ${preview?'':`data-a="go" data-v="${k}" aria-label="${label}"`}>${ICON[icon]}<span>${label}</span></${preview?'span':'button'}>`;
+return nb('discover','discover','Discover','var(--n1)')+nb('pal','palettes','Palettes','var(--n2)')+(preview?`<span class="scanbtn" style="width:44px;height:44px">${ICON.scan}</span>`:`<button class="scanbtn" data-a="scan" aria-label="Scan a photo">${ICON.scan}</button>`)+nb('library','library','Library','var(--n4)')+nb('settings','settings','Settings','#fff')}
+function renderNav(){$('nav').innerHTML=navButtons(S.view==='build'?S.prev:S.view,false)}
 let io=null;
-function renderMain(){const m=$('main');if(io){io.disconnect();io=null}
-if(S.view==='discover')m.innerHTML=S.setup?setupHTML():streamHTML();
-else if(S.view==='pal')m.innerHTML=palHTML();
-else if(S.view==='library')m.innerHTML=libraryHTML();
-else if(S.view==='settings')m.innerHTML=settingsHTML();
-else if(S.view==='build')m.innerHTML=buildHTML();
-if(S.view==='discover')watchSentinel();
-if(S.view==='pal')hydrateThumbs()}
+function renderMain(){const m=$('main');if(io){io.disconnect();io=null}const v=S.view;
+m.innerHTML=v==='discover'?(S.setupOpen?setupHTML():streamHTML()):v==='pal'?palHTML():v==='library'?libraryHTML():v==='settings'?settingsHTML():v==='build'?buildHTML():'';
+if(v==='discover')watchSentinel();if(v==='pal')hydrateThumbs();fillTaglist()}
 function render(){renderHeader();renderNav();renderMain()}
-function go(v){if(v!=='build')S.prev=v;S.view=v;S.menu=null;render();window.scrollTo(0,0)}
+function go(v){if(v!=='build')S.prev=v;S.view=v;S.menu=null;S.renaming=null;S.editSrc=false;clearSearch();render();window.scrollTo(0,0)}
 
-/* Discover */
-function setupBarHTML(){const n=S.likeHex.length;const picks=[...S.likeHex].sort((a,b)=>Lof(a)-Lof(b));return`<div class="row"><div class="sp"><div class="h2">Pick 50 colors you love</div><div class="lbl">${n} of 50 · mix hues, darks and lights</div></div><button class="btn ${n>=50?'pri':'out'}" data-a="done50">Done</button></div><div style="display:flex;gap:3px;overflow-x:auto;margin-top:10px;min-height:20px;scrollbar-width:none">${picks.map(h=>`<div role="button" aria-label="Remove ${h}" data-a="like" data-v="${h}" style="flex:0 0 20px;height:20px;border-radius:5px;background:${h}"></div>`).join('')}</div>`}
+/* ---------- Discover ---------- */
+function setupBarHTML(){const n=S.likeHex.length;const picks=[...S.likeHex].sort((a,b)=>Lof(a)-Lof(b));return`<div class="row"><div class="sp"><div class="h2">Pick 50 colors you love</div><div class="lbl" style="margin-top:2px"><b style="color:var(--fg)">${n} of 50</b> · mix hues, darks and lights</div></div><button class="btn ${n>=50?'pri':'out'}" data-a="done50">Done</button></div><div style="display:flex;gap:3px;overflow-x:auto;margin-top:10px;min-height:20px;scrollbar-width:none">${picks.map(h=>`<div role="button" aria-label="Remove ${h}" data-a="like" data-v="${h}" style="flex:0 0 20px;height:20px;border-radius:5px;background:${h}"></div>`).join('')}</div>`}
 const setupItem=h=>`<div><div class="sw${S.likeHex.includes(h)?' sel':''}" role="button" aria-label="${label(h)}" data-a="like" data-v="${h}" style="background:${h}"></div><div class="tiny">${label(h)}</div></div>`;
-function setupHTML(){return`<div class="sticky" id="sbar">${setupBarHTML()}</div><div id="setgrid" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 9px">${S.pool.map(setupItem).join('')}</div><div id="sent" style="height:40px"></div><button class="btn ghost" data-a="skip" style="margin-top:8px">Skip for now</button>`}
+function setupHTML(){return`<div class="sticky" id="sbar">${setupBarHTML()}</div><div class="lbl" style="margin-bottom:14px">Your picks teach Discover what you like, so it shows you more colors you'll love. Tap Done whenever you want a break and finish later.</div><div id="setgrid" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 9px">${S.pool.map(setupItem).join('')}</div><div id="sent" style="height:40px"></div>`}
 const swc=h=>`<div class="sw" role="button" aria-label="${h}" data-a="pick" data-v="${h}" style="background:${h}">${S.draft&&S.draft.base.includes(h)?`<span class="ck">${ICON.check}</span>`:''}</div>`;
-function streamHTML(){const top=S.draft?`<div class="sticky" data-host="draft" data-mode="disc">${draftHTML('disc')}</div>`:`<div class="row" style="margin-bottom:16px"><h1 class="h1 sp">Discover</h1><button class="btn pri" data-a="create">${ICON.plus}Create palette</button></div>`;
-return top+`<div class="row"><span class="slab">My taste</span><div class="rng"><input type="range" id="variety" min="0" max="100" step="1" value="${S.variety}" aria-label="My taste or variety"></div><span class="slab r">Variety</span></div><div style="height:16px"></div><div class="row" style="margin-bottom:18px"><span class="slab">Smaller</span><div class="rng"><input type="range" id="zoom" min="3" max="9" step="1" value="${12-S.zoom}" aria-label="Swatch size"></div><span class="slab r">Bigger</span></div>
-<div id="sgrid" style="display:grid;grid-template-columns:repeat(${S.zoom},minmax(0,1fr));gap:5px">${S.stream.map(swc).join('')}</div><div id="sent" style="height:60px;display:flex;align-items:center;justify-content:center" class="lbl">Loading more colors…</div>`}
+function discControls(){const n=S.likeHex.length;let s='';
+if(!S.draft&&n<50)s+=`<button class="btn pri start" data-a="starthere">Start here${n?`<span class="badge">${n}</span>`:''}</button><div class="lbl" style="text-align:center;margin:8px 0 18px">${n?`${n} of 50 picked. Keep going any time to finish setting up your color profile.`:'Pick 50 colors you love so Discover learns your taste.'}</div>`;
+s+=`<div class="row" style="margin-bottom:12px">${S.draft?'':`<button class="btn out" data-a="create">${ICON.plus}Create palette</button>`}<span class="sp"></span><div class="seg"><button class="${S.sort==='random'?'on':''}" data-a="sort" data-v="random">Random</button><button class="${S.sort==='hue'?'on':''}" data-a="sort" data-v="hue">By hue</button></div></div>`;
+s+=`<div class="tagscroll" style="margin-bottom:16px"><button class="tagc${S.hues.size?'':' on'}" data-a="hue" data-v="all">All hues</button>${FAM.map(f=>`<button class="tagc hue${S.hues.has(f[0])?' on':''}" data-a="hue" data-v="${f[0]}" aria-pressed="${S.hues.has(f[0])}"><i style="background:${f[3]}"></i>${f[1]}</button>`).join('')}</div>`;
+s+=`${trk('variety','My taste','Variety')}<div style="height:6px"></div>${trk('zoom','Smaller','Bigger')}<div style="height:14px"></div>`;return s}
+function streamHTML(){const top=S.draft?`<div class="sticky" data-host="draft" data-mode="disc">${draftHTML('disc')}</div>`:'';
+return top+discControls()+`<div id="sgrid" style="display:grid;grid-template-columns:repeat(${S.zoom},minmax(0,1fr));gap:5px">${S.stream.map(swc).join('')}</div><div id="sent" style="height:60px;display:flex;align-items:center;justify-content:center" class="lbl">Loading more colors…</div>`}
+function paintStream(){const g=$('sgrid');if(g)g.innerHTML=S.stream.map(swc).join('')}
 let loading=false;
 function watchSentinel(){const s=$('sent');if(!s||!('IntersectionObserver' in window))return;io=new IntersectionObserver(es=>{if(es[0].isIntersecting)loadMore()},{rootMargin:'700px 0px'});io.observe(s)}
-function loadMore(){if(loading)return;loading=true;setTimeout(()=>{if(S.view==='discover'){if(S.setup){const b=setupBatch();S.pool.push(...b);const g=$('setgrid');if(g)g.insertAdjacentHTML('beforeend',b.map(setupItem).join(''))}else{const b=streamBatch(40);S.stream.push(...b);const g=$('sgrid');if(g)g.insertAdjacentHTML('beforeend',b.map(swc).join(''))}}loading=false},30)}
+function loadMore(){if(loading)return;loading=true;setTimeout(()=>{if(S.view==='discover'){if(S.setupOpen){const b=setupBatch();S.pool.push(...b);const g=$('setgrid');if(g)g.insertAdjacentHTML('beforeend',b.map(setupItem).join(''))}else{const b=streamBatch(40);S.stream.push(...b);const g=$('sgrid');if(g)g.insertAdjacentHTML('beforeend',b.map(swc).join(''))}}loading=false},30)}
 
-/* Palettes */
-function groupsFor(list){const mine=list.filter(isMine),other=list.filter(p=>!isMine(p));const keys=[...new Set(mine.map(srcOf)),...new Set(other.map(srcOf))];return[...new Set(keys)].map(k=>({key:'src:'+k,title:k,items:list.filter(p=>srcOf(p)===k)})).filter(g=>g.items.length)}
-const GROUPS={find:()=>null};
-function matches(p){const q=S.q.trim().toLowerCase();if(S.tagF&&!(p.tags||[]).includes(S.tagF))return false;if(!q)return true;const hay=[p.name,p.src,srcLine(p),kindOf(p),...(p.tags||[]),...p.colors,...p.colors.map(h=>h.slice(1))].join(' ').toLowerCase();return q.split(/\s+/).every(w=>hay.includes(w.replace('#','')))}
-function allTags(){const c=new Map();S.saved.forEach(p=>(p.tags||[]).forEach(t=>c.set(t,(c.get(t)||0)+1)));return[...c.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0])}
+/* ---------- Palettes ---------- */
+function groupsFor(list){const mine=list.filter(isMine),other=list.filter(p=>!isMine(p));const keys=[...new Set([...mine.map(srcOf),...other.map(srcOf)])];return keys.map(k=>({key:'src:'+k,title:k,items:list.filter(p=>srcOf(p)===k)})).filter(g=>g.items.length)}
+const palOrder=()=>groupsFor(S.saved).flatMap(g=>g.items);
+const swatchRow=(p,act)=>`<div class="pal">${p.colors.map(h=>`<div data-a="${act}" data-v="${act==='copy'?h:p.id}" style="background:${h}" role="button" aria-label="${act==='copy'?'Copy '+h:'Edit '+esc(p.name)}"></div>`).join('')}</div><div class="hexrow mono">${p.colors.map(h=>`<span>${h.slice(1)}</span>`).join('')}</div>`;
+const chevSpan=(open,closedDeg)=>`<span style="display:inline-flex;transform:rotate(${open?(closedDeg===-90?0:180):(closedDeg===-90?-90:0)}deg);transition:transform .15s">${ICON.chev}</span>`;
 function palCard(p){if(S.draft&&S.draft.id===p.id)return`<div class="card ed" data-host="draft" data-mode="pal">${draftHTML('pal')}</div>`;
-const photo=p.photoId&&MEM.has(p.photoId);const col=S.collapsed.has(p.id);const armed=S.armed==='del'+p.id;const menu=S.menu===p.id;
-return`<div class="card"><div class="h2" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</div><div class="lbl" style="margin:3px 0 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="color:var(--fg);font-weight:600;letter-spacing:.02em">${esc(srcLine(p))}</span>${(p.tags||[]).length?' · '+(p.tags).map(esc).join(' · '):''}</div><div class="pal">${p.colors.map(h=>`<div data-a="copy" data-v="${h}" style="background:${h}" role="button" aria-label="Copy ${h}"></div>`).join('')}</div><div class="hexrow mono">${p.colors.map(h=>`<span>${h.slice(1)}</span>`).join('')}</div>
-<div class="row"><button class="btn sm" data-a="menu" data-v="${p.id}" aria-expanded="${menu}">${ICON.copy}Copy<span style="display:inline-flex;transform:rotate(${menu?180:0}deg)">${ICON.chev}</span></button><button class="btn sm icon" data-a="share" data-v="${p.id}" aria-label="Share ${esc(p.name)}">${ICON.share}</button><span class="sp"></span><button class="btn sm out" data-a="edit" data-v="${p.id}">Edit</button><button class="btn sm ${armed?'warn':'ghost'}" data-a="del" data-v="${p.id}">${armed?'Tap again':'Delete'}</button></div>
-${menu?copyMenu(p.id):''}
-${photo?`<button class="btn sm ghost" data-a="togglephoto" data-v="${p.id}" style="padding:0 2px;gap:4px;margin-top:8px"><span style="display:inline-flex;transform:rotate(${col?-90:0}deg);transition:transform .15s">${ICON.chev}</span>${col?'Show photo':'Photo'}</button>${col?'':`<div class="ph"><canvas data-thumb="${p.id}"></canvas></div>`}`:''}</div>`}
-function palHTML(){const newEd=S.draft&&!S.draft.id?`<div class="card ed" data-host="draft" data-mode="pal">${draftHTML('pal')}</div>`:'';const filtering=S.q.trim()||S.tagF;const list=S.saved.filter(matches);
-const groups=groupsFor(list).map(g=>{const closed=!filtering&&S.closedGroups.has(g.key);return`<button class="grp" data-a="group" data-v="${esc(g.key)}" aria-expanded="${!closed}"><span class="h2 sp" style="text-align:left">${esc(g.title)}</span><span class="lbl">${g.items.length}</span><span class="chev" style="transform:rotate(${closed?-90:0}deg)">${ICON.chev}</span></button>${closed?'':g.items.map(palCard).join('')}`}).join('');
-const tags=allTags();
-return`<h1 class="h1" style="margin-bottom:14px">Palettes</h1><div class="row"><input type="text" id="imp" placeholder="Paste hex codes or a palette link" aria-label="Import palette"><button class="btn" data-a="import">Add</button></div><div id="imperr" style="font-size:13px;color:var(--danger);min-height:20px;margin:4px 0 2px"></div>${S.draft?'':`<div class="row center" style="margin-bottom:20px"><button class="btn big pri" data-a="createp" style="min-width:220px">${ICON.plus}New palette</button></div>`}${newEd}
-<input type="text" id="q" value="${esc(S.q)}" placeholder="Search names, tags or hex codes" aria-label="Search palettes" style="margin-bottom:10px">${tags.length?`<div class="tagscroll" style="margin-bottom:6px">${tags.map(t=>`<button class="tagc${S.tagF===t?' on':''}" data-a="tagf" data-v="${esc(t)}">${esc(t)}</button>`).join('')}</div>`:''}
-<div id="plist">${groups||(filtering?'<div class="card"><div class="h2">No matches</div><div class="lbl" style="margin-top:4px">Try another word, tag or hex code.</div></div>':'<div class="card"><div class="h2">Your palettes live here</div><div class="lbl" style="margin-top:4px">Scan a photo or tap colors in Discover to make your first one.</div></div>')}</div>`}
-function hydrateThumbs(){document.querySelectorAll('canvas[data-thumb]').forEach(async cv=>{const p=S.saved.find(x=>x.id===cv.dataset.thumb);if(!p)return;const im=await photoImg(p.photoId);if(!im)return;const dpr=window.devicePixelRatio||1;const W=cv.clientWidth,H=cv.clientHeight;cv.width=W*dpr;cv.height=H*dpr;const sc=p.scan||{z:1,cx:.5,cy:.5};const iw=im.naturalWidth,ih=im.naturalHeight;const side=Math.min(iw,ih)/sc.z;const cx=clamp(sc.cx*iw,side/2,iw-side/2),cy=clamp(sc.cy*ih,side/2,ih-side/2);const ar=W/H;cv.getContext('2d').drawImage(im,cx-side/2,cy-side/ar/2,side,side/ar,0,0,cv.width,cv.height)})}
+const photo=p.photoId&&MEM.has(p.photoId);const open=S.openPh.has(p.id);const armed=S.armed==='del'+p.id;const menu=S.menu===p.id;
+const name=S.renaming===p.id?`<input type="text" class="name" id="rn" data-id="${p.id}" value="${esc(p.name)}" aria-label="Rename palette" enterkeyhint="done" autocomplete="off">`:`<button class="nmbtn" data-a="rename" data-v="${p.id}" aria-label="Rename ${esc(p.name)}">${esc(p.name)}</button>`;
+return`<div class="card"><div class="row" style="align-items:flex-start">${name}<button class="btn sm ghost icon" data-a="share" data-v="${p.id}" aria-label="Share ${esc(p.name)}" style="margin:-5px -8px 0 0">${ICON.share}</button></div><div class="srcl" style="margin:2px 0 10px">${esc(srcLine(p))}</div>${swatchRow(p,'copy')}
+<div class="row"><button class="btn sm" data-a="menu" data-v="${p.id}" aria-expanded="${menu}">${ICON.copy}Copy${chevSpan(menu,0)}</button><span class="sp"></span><button class="btn sm" data-a="match" data-v="${p.id}">Match</button><button class="btn sm out" data-a="edit" data-v="${p.id}">Edit</button><button class="btn sm ${armed?'warn':'ghost'}" data-a="del" data-v="${p.id}">${armed?'Tap again':'Delete'}</button></div>${menu?copyMenu(p.id):''}
+${photo?`<button class="btn sm ghost" data-a="togglephoto" data-v="${p.id}" aria-expanded="${open}" style="padding:0 2px;gap:4px;margin-top:8px">${chevSpan(open,-90)}${open?'Hide photo':'Photo'}</button>${open?`<div class="ph"><canvas data-thumb="${p.id}"></canvas></div>`:''}`:''}</div>`}
+function tileImg(p){const ph=p.photoId&&MEM.get(p.photoId);return`<div class="img">${ph?`<img src="${ph.thumb}" alt="">`:p.colors.map(h=>`<div style="background:${h}"></div>`).join('')}</div>${ph?`<div class="mini" style="margin:0;border-radius:0;height:9px">${p.colors.map(h=>`<div style="background:${h}"></div>`).join('')}</div>`:''}`}
+const tile=p=>`<button class="htile" data-a="view" data-v="${p.id}" data-ctx="pal">${tileImg(p)}<div class="meta"><div class="nm">${esc(p.name)}</div><div class="src">${esc(srcLine(p))}</div></div></button>`;
+function palHTML(){const top=S.draft&&!S.draft.id?`<div class="card ed" data-host="draft" data-mode="pal">${draftHTML('pal')}</div>`:`<div class="row center" style="margin-bottom:16px"><button class="btn big pri" data-a="createp" style="min-width:230px">${ICON.plus}New palette</button></div>`;
+const ctrl=`<div class="row" style="margin-bottom:4px"><div class="seg"><button class="${S.palMode==='list'?'on':''}" data-a="palmode" data-v="list">List</button><button class="${S.palMode==='grid'?'on':''}" data-a="palmode" data-v="grid">Grid</button></div><span class="sp"></span>${S.palMode==='grid'?`<span class="lbl">Columns</span><div class="seg">${[2,3,4].map(n=>`<button class="${S.cols===n?'on':''}" data-a="cols" data-v="${n}" aria-label="${n} columns">${n}</button>`).join('')}</div>`:''}</div>`;
+const groups=groupsFor(S.saved).map(g=>{const closed=S.closedGroups.has(g.key);return`<button class="grp" data-a="group" data-v="${esc(g.key)}" aria-expanded="${!closed}"><span class="h2 sp" style="text-align:left">${esc(g.title)}</span><span class="lbl">${g.items.length}</span><span class="chev" style="transform:rotate(${closed?-90:0}deg)">${ICON.chev}</span></button>${closed?'':S.palMode==='grid'?`<div class="hgrid" style="grid-template-columns:repeat(${S.cols},minmax(0,1fr));margin-bottom:12px">${g.items.map(tile).join('')}</div>`:g.items.map(palCard).join('')}`}).join('');
+return top+ctrl+`<div id="plist">${groups||'<div class="card"><div class="h2">Your palettes live here</div><div class="lbl" style="margin-top:4px">Scan a photo or tap colors in Discover to make your first one.</div></div>'}</div>`}
+async function drawCrop(cv,p){const im=await photoImg(p.photoId);if(!im)return;const dpr=window.devicePixelRatio||1;const W=cv.clientWidth,H=cv.clientHeight||W;if(!W)return;cv.width=W*dpr;cv.height=H*dpr;const sc=p.scan||{z:1,cx:.5,cy:.5};const iw=im.naturalWidth,ih=im.naturalHeight;const side=Math.min(iw,ih)/sc.z;const cx=clamp(sc.cx*iw,side/2,iw-side/2),cy=clamp(sc.cy*ih,side/2,ih-side/2);const ar=W/H;cv.getContext('2d').drawImage(im,cx-side/2,cy-side/ar/2,side,side/ar,0,0,cv.width,cv.height)}
+function hydrateThumbs(){document.querySelectorAll('canvas[data-thumb]').forEach(cv=>{const p=S.saved.find(x=>x.id===cv.dataset.thumb);if(p)drawCrop(cv,p)})}
 
-/* Library: a showcase of your own palettes, each opens full screen */
-function libList(){let l=S.saved.filter(isMine);if(S.libF==='custom')l=l.filter(p=>!p.photoId);else if(S.libF==='scanned')l=l.filter(p=>p.photoId);return l}
-function libraryHTML(){const l=libList();const who=S.creator?esc(S.creator)+"’s":'Your';
-const head=S.editSrc?`<div class="row" style="margin-bottom:12px"><input type="text" id="libsrc" value="${esc(S.creator)}" placeholder="Your name or business, like A-Frame" aria-label="Your source name"><button class="btn pri" data-a="savesrc">Save</button><button class="btn ghost" data-a="cancelsrc">Cancel</button></div>`:`<div class="row" style="margin-bottom:4px"><h1 class="h1 sp" style="min-width:0">${who} Library</h1><button class="btn sm ghost" data-a="editsrc" aria-label="Edit your source name">${S.creator?'Rename':'Set name'}</button></div>`;
-const chips=[['all','All'],['custom','Custom'],['scanned','Scanned']].map(([k,t])=>`<button class="tagc${S.libF===k?' on':''}" data-a="libf" data-v="${k}">${t}</button>`).join('');
-return`${head}<div class="lbl" style="margin-bottom:12px">Everything you've made${S.creator?' as '+esc(S.creator):''}. Tap one to see it full screen.</div><div class="tagrow" style="margin-bottom:14px">${chips}<span class="sp"></span><span class="lbl">${l.length}</span></div>
-${l.length?`<div class="lgrid">${l.map(p=>{const ph=p.photoId&&MEM.get(p.photoId);return`<button class="lcard" data-a="view" data-v="${p.id}"><div class="img">${ph?`<img src="${ph.thumb}" alt="">`:p.colors.map(h=>`<div style="background:${h}"></div>`).join('')}</div><div class="meta"><div class="nm">${esc(p.name)}</div><div class="lbl" style="font-size:11px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(srcLine(p))}</div><div class="mini">${p.colors.map(h=>`<div style="background:${h}"></div>`).join('')}</div></div></button>`}).join('')}</div>`:'<div class="card"><div class="h2">Nothing here yet</div><div class="lbl" style="margin-top:4px">Scan a photo or make a palette in Discover and it shows up here.</div></div>'}
+/* ---------- Library: your own palettes, each opens full screen ---------- */
+function libList(){let l=S.saved.filter(isMine);if(S.libF==='custom')l=l.filter(p=>!p.photoId);else if(S.libF==='scanned')l=l.filter(p=>p.photoId);else if(S.libF==='fav')l=l.filter(p=>p.fav);return l}
+const heartBtn=p=>`<button class="heart${p.fav?' on':''}" data-a="fav" data-v="${p.id}" aria-pressed="${!!p.fav}" aria-label="${p.fav?'Remove from':'Add to'} favorites">${p.fav?ICON.heartOn:ICON.heart}</button>`;
+function libraryHTML(){const l=libList();
+const head=S.editSrc?`<div class="lbl" style="margin-bottom:6px">Your source name, shown on everything you make</div><div class="row" style="margin-bottom:14px"><input type="text" id="libsrc" list="srclist" value="${esc(S.creator)}" placeholder="Your name or business, like A-Frame" aria-label="Your source name" autocomplete="off" enterkeyhint="done"><button class="btn pri" data-a="savesrc">Save</button><button class="btn ghost" data-a="cancelsrc">Cancel</button></div>${srcDatalist()}`:`<div class="row" style="margin-bottom:12px"><span class="lbl sp">Everything you've made as ${esc(S.creator)}. Tap one to see it full screen.</span><button class="btn sm" data-a="editsrc">Edit name</button></div>`;
+const chips=[['all','All'],['custom','Custom'],['scanned','Scanned'],['fav','Favorites']].map(([k,t])=>`<button class="tagc${S.libF===k?' on':''}" data-a="libf" data-v="${k}">${t}</button>`).join('');
+const card=p=>`<div class="lcard" role="button" tabindex="0" data-a="view" data-v="${p.id}" data-ctx="lib">${tileImg(p)}<div class="meta"><div class="nm">${esc(p.name)}</div><div class="row" style="gap:2px;margin-top:2px"><span class="srcl sp" style="font-size:10.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(srcLine(p))}</span>${heartBtn(p)}</div></div></div>`;
+return`${head}<div class="tagrow" style="margin-bottom:14px">${chips}<span class="sp"></span><span class="lbl">${l.length}</span></div>
+${l.length?`<div class="lgrid">${l.map(card).join('')}</div>`:`<div class="card"><div class="h2">${S.libF==='fav'?'No favorites yet':'Nothing here yet'}</div><div class="lbl" style="margin-top:4px">${S.libF==='fav'?'Tap the heart on any palette to keep it here.':'Scan a photo or make a palette in Discover and it shows up here.'}</div></div>`}
 <div class="pastebox" id="pastebox" contenteditable="true" role="textbox" aria-label="Paste a screenshot" style="margin-top:20px">Copied a screenshot? Tap here, then Paste</div>`}
 function renderViewer(){const v=S.viewer;const o=$('ov');if(!v){if(!S.studio)o.innerHTML='';lockScroll();return}const p=S.saved.find(x=>x.id===v.ids[v.i]);if(!p){S.viewer=null;renderViewer();return}const ph=p.photoId&&MEM.has(p.photoId);const menu=S.menu==='fs'+p.id;
 o.innerHTML=`<div class="fs" id="fs"><div class="fs-top"><button class="btn sm ghost icon" data-a="vclose" aria-label="Close">${ICON.close}</button><span class="lbl sp" style="text-align:center">${v.i+1} of ${v.ids.length}</span><button class="btn sm ghost icon" data-a="share" data-v="${p.id}" aria-label="Share">${ICON.share}</button></div>
-<div class="fs-body" id="fsb">${ph?`<div class="fs-ph"><canvas data-fsthumb="${p.id}"></canvas></div>`:''}<div class="pal" style="height:${ph?96:180}px;border-radius:16px">${p.colors.map(h=>`<div data-a="copy" data-v="${h}" style="background:${h}" role="button" aria-label="Copy ${h}"></div>`).join('')}</div><div class="hexrow mono" style="font-size:12px">${p.colors.map(h=>`<span>${h.slice(1)}</span>`).join('')}</div>
-<h2 class="h1" style="font-size:24px;margin-top:4px">${esc(p.name)}</h2><div class="lbl" style="margin-top:4px;color:var(--fg);font-weight:600;letter-spacing:.02em">${esc(srcLine(p))}</div><div class="tagrow" style="margin:10px 0 16px">${(p.tags||[]).map(t=>`<span class="tagc">${esc(t)}</span>`).join('')}</div>
-<div class="row"><button class="btn" data-a="menu" data-v="fs${p.id}">${ICON.copy}Copy<span style="display:inline-flex;transform:rotate(${menu?180:0}deg)">${ICON.chev}</span></button><button class="btn" data-a="share" data-v="${p.id}">${ICON.share}Share</button><span class="sp"></span><button class="btn pri" data-a="vedit" data-v="${p.id}">Edit</button></div>${menu?copyMenu(p.id):''}</div>
-<div class="fs-bot"><button class="btn big" style="flex:1" data-a="vprev" ${v.i===0?'aria-disabled="true"':''}>${ICON.back}Previous</button><button class="btn big" style="flex:1" data-a="vnext">Next<span style="display:inline-flex;transform:rotate(180deg)">${ICON.back}</span></button></div></div>`;
+<div class="fs-body" id="fsb">${ph?`<div class="fs-ph" data-a="vedit" data-v="${p.id}" role="button" aria-label="Edit this palette"><canvas data-fsthumb="${p.id}"></canvas></div>`:''}<div class="pal" style="height:${ph?96:180}px;border-radius:16px">${p.colors.map(h=>`<div data-a="vedit" data-v="${p.id}" style="background:${h}" role="button" aria-label="Edit ${h}"></div>`).join('')}</div><div class="hexrow mono" style="font-size:12px">${p.colors.map(h=>`<span>${h.slice(1)}</span>`).join('')}</div>
+<div class="row" style="margin-top:4px;align-items:flex-start"><h2 class="h1 sp" style="font-size:24px">${esc(p.name)}</h2>${heartBtn(p)}</div><div class="srcl" style="margin-top:6px">${esc(srcLine(p))}</div>${(p.tags||[]).length?`<div class="tagrow" style="margin-top:10px">${p.tags.map(t=>`<span class="tagc">${esc(t)}</span>`).join('')}</div>`:''}<div class="lbl" style="margin:10px 0 14px">Tap the photo or colors to edit.</div>
+<div class="row"><button class="btn" data-a="menu" data-v="fs${p.id}" aria-expanded="${menu}">${ICON.copy}Copy${chevSpan(menu,0)}</button><span class="sp"></span><button class="btn" data-a="vmatch" data-v="${p.id}">Match</button><button class="btn pri" data-a="vedit" data-v="${p.id}">Edit</button></div>${menu?copyMenu(p.id):''}</div>
+<div class="fs-bot"><button class="btn big" style="flex:1" data-a="vprev">${ICON.back}Previous</button><button class="btn big" style="flex:1" data-a="vnext">Next<span style="display:inline-flex;transform:rotate(180deg)">${ICON.back}</span></button></div></div>`;
 lockScroll();const cv=o.querySelector('canvas[data-fsthumb]');if(cv)drawCrop(cv,p);bindSwipe()}
-async function drawCrop(cv,p){const im=await photoImg(p.photoId);if(!im)return;const dpr=window.devicePixelRatio||1;const W=cv.clientWidth,H=cv.clientHeight||W;cv.width=W*dpr;cv.height=H*dpr;const sc=p.scan||{z:1,cx:.5,cy:.5};const iw=im.naturalWidth,ih=im.naturalHeight;const side=Math.min(iw,ih)/sc.z;const cx=clamp(sc.cx*iw,side/2,iw-side/2),cy=clamp(sc.cy*ih,side/2,ih-side/2);const ar=W/H;cv.getContext('2d').drawImage(im,cx-side/2,cy-side/ar/2,side,side/ar,0,0,cv.width,cv.height)}
 function bindSwipe(){const el=$('fsb');if(!el)return;let x0=null,y0=null;el.addEventListener('touchstart',e=>{x0=e.touches[0].clientX;y0=e.touches[0].clientY},{passive:true});el.addEventListener('touchend',e=>{if(x0==null)return;const dx=e.changedTouches[0].clientX-x0,dy=e.changedTouches[0].clientY-y0;x0=null;if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5)A[dx<0?'vnext':'vprev']()},{passive:true})}
 const copyMenu=id=>`<div class="menu"><button data-a="copyhex" data-v="${id}"><div class="t">Copy hex codes</div><div class="d">The codes, ready to paste anywhere</div></button><button data-a="copycss" data-v="${id}"><div class="t">Copy for websites</div><div class="d">Code a web designer pastes in so a site uses these exact colors</div></button><button data-a="paintsoon" class="soon"><div class="t">Match to paint colors</div><div class="d">Coming soon: the nearest paint chips for each color</div></button></div>`;
 
-/* Settings */
-function themeRow(t,i,kind,cur){cur=cur||S.theme;const on=!!(cur&&cur.cols&&cur.name===t.name&&cur.cols.join()===t.cols.join());return`<button class="theme${on?' on':''}" data-a="theme" data-v="${kind}:${i}"><span class="dots4">${t.cols.slice(0,4).map(c=>`<i style="background:${readable(c)}"></i>`).join('')}</span><span class="sp" style="font-weight:600">${esc(t.name)}</span>${on?`<span style="color:var(--acc);display:inline-flex">${ICON.check}</span>`:''}</button>`}
-function settingsHTML(){const n=S.saved.length,m=MEM.size;const armed=S.armed==='reset';const mine=S.saved.filter(p=>p.colors.length>=2&&isMine(p)).slice(0,12);const nt=S.navTheme;
-return`<h1 class="h1" style="margin-bottom:18px">Settings</h1>
-<div class="sect"><div class="h2" style="margin-bottom:4px">Your source name</div><div class="lbl" style="margin-bottom:10px">Shown on everything you make, the way Color Hunt is shown on theirs. Changing it updates all your palettes.</div><input type="text" id="creator" value="${esc(S.creator)}" placeholder="Your name or business, like A-Frame" aria-label="Your source name"></div>
-<div class="sect"><div class="h2" style="margin-bottom:4px">Theme</div><div class="lbl" style="margin-bottom:12px">Colors the buttons, bar edges and glow. Each bottom tab takes one color from the theme.</div>${THEMES.map((t,i)=>themeRow(t,i,'c')).join('')}${mine.length?`<div class="lbl" style="margin:14px 0 8px">From your palettes</div>${mine.map((p,i)=>themeRow({name:p.name,cols:p.colors},S.saved.indexOf(p),'p')).join('')}`:''}</div>
-<div class="sect"><div class="h2" style="margin-bottom:4px">Bottom bar icons</div><div class="lbl" style="margin-bottom:10px">Labels stay white. Choose how the icons light up when tapped.</div><div class="seg" style="margin-bottom:10px"><button class="${nt==='match'?'on':''}" data-a="navtheme" data-v="match">Match theme</button><button class="${nt==='white'?'on':''}" data-a="navtheme" data-v="white">White</button><button class="${nt&&nt.cols?'on':''}" data-a="navtheme" data-v="pick">Own colors</button></div>${nt&&nt.cols||S.navPick?`${THEMES.map((t,i)=>themeRow(t,i,'nc',nt)).join('')}${mine.map(p=>themeRow({name:p.name,cols:p.colors},S.saved.indexOf(p),'np',nt)).join('')}`:''}</div>
-<div class="sect"><div class="h2" style="margin-bottom:6px">Your taste</div><div class="lbl" style="margin-bottom:10px">${S.likeHex.length} colors picked. Discover uses them to show you colors you'll like.</div><button class="btn" data-a="retake">Retake taste test</button></div>
-<div class="sect card"><div class="row"><span style="width:10px;height:10px;border-radius:50%;background:#6EC98A;flex-shrink:0"></span><span class="h2">Saved on this phone</span></div><div class="lbl" style="margin-top:6px">${n} palette${n===1?'':'s'} · ${m} photo${m===1?'':'s'}${DB.db?'':' · photos last until you close this page'}</div><div class="lbl" style="margin-top:8px">Add ColorShare to your Home Screen to keep your palettes safe. iPhone can clear data for web apps that aren't on the Home Screen.</div></div>
-<div class="sect"><div class="h2" style="margin-bottom:4px">Move your palettes</div><div class="lbl" style="margin-bottom:10px">Copy your palettes here, then paste them into ColorShare on another device or website. Photos stay on this device.</div><button class="btn" data-a="exportp">${ICON.copy}Copy my palettes</button><textarea id="impjson" placeholder="Paste copied palettes here" aria-label="Paste palettes to import" style="display:block;width:100%;height:80px;margin-top:10px;font:inherit;font-size:14px;padding:10px 12px;border-radius:12px;border:1px solid var(--line2);background:var(--s2);color:var(--fg);resize:vertical"></textarea><button class="btn" data-a="importp" style="margin-top:8px">Import pasted palettes</button></div>
+/* ---------- Settings ---------- */
+function themeGroups(kind){const g=[{key:'cur',title:'ColorShare curated',items:THEMES.map((t,i)=>({t,v:`${kind}c:${i}`}))}];const pals=S.saved.filter(p=>p.colors.length>=3);const asT=p=>({t:{name:p.name,cols:[...p.colors]},v:`${kind}p:${p.id}`});
+const mine=pals.filter(isMine);if(mine.length)g.push({key:'mine',title:'My palettes',items:mine.map(asT)});
+[...new Set(pals.filter(p=>!isMine(p)).map(srcOf))].forEach(s=>g.push({key:'s:'+s,title:s,items:pals.filter(p=>!isMine(p)&&srcOf(p)===s).map(asT)}));return g}
+function themeRow(t,v,cur){const on=!!(cur&&cur.cols&&cur.name===t.name&&cur.cols.join()===t.cols.join());return`<button class="theme${on?' on':''}" data-a="theme" data-v="${esc(v)}"><span class="dots4">${themeCols(t.cols).map(c=>`<i style="background:${c}"></i>`).join('')}</span><span class="sp" style="font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.name)}</span>${on?`<span style="color:var(--acc);display:inline-flex">${ICON.check}</span>`:''}</button>`}
+function themeList(kind,cur){return themeGroups(kind).map(g=>{const k=kind+g.key;const open=S.themeOpen.has(k);return`<button class="grp" data-a="tgroup" data-v="${esc(k)}" aria-expanded="${open}" style="margin:0 0 8px"><span class="sp" style="text-align:left;font-weight:600">${esc(g.title)}</span><span class="lbl">${g.items.length}</span><span class="chev" style="transform:rotate(${open?0:-90}deg)">${ICON.chev}</span></button>${open?g.items.map(x=>themeRow(x.t,x.v,cur)).join(''):''}`}).join('')}
+function settingsHTML(){const n=S.saved.length,m=MEM.size;const armed=S.armed==='reset';const nt=S.navTheme;const lk=S.likeHex.length;
+return`<div class="sect"><div class="h2" style="margin-bottom:4px">Your source name</div><div class="lbl" style="margin-bottom:10px">Added to everything you scan, paste or create, the way Color Hunt shows on theirs. Changing it updates all your palettes.</div><input type="text" id="creator" list="srclist" value="${esc(S.creator)}" placeholder="Your name or business, like A-Frame" aria-label="Your source name" autocomplete="off" enterkeyhint="done">${srcDatalist()}</div>
+<div class="sect"><div class="h2" style="margin-bottom:4px">Theme</div><div class="lbl" style="margin-bottom:12px">Colors the buttons and edges. Each preview shows the four most different colors in that palette.</div>${themeList('',S.theme)}</div>
+<div class="sect"><div class="h2" style="margin-bottom:4px">Bottom bar icons</div><div class="lbl" style="margin-bottom:10px">Labels stay white. Each icon takes its own color.</div><div class="navprev" aria-hidden="true">${navButtons('',true)}</div><div class="seg"><button class="${nt==='match'&&!S.navPick?'on':''}" data-a="navtheme" data-v="match">Match theme</button><button class="${nt==='white'&&!S.navPick?'on':''}" data-a="navtheme" data-v="white">White</button><button class="${(nt&&nt.cols)||S.navPick?'on':''}" data-a="navtheme" data-v="pick">Own colors</button></div>${(nt&&nt.cols)||S.navPick?`<div style="margin-top:12px">${themeList('n',nt)}</div>`:''}</div>
+<div class="sect"><div class="h2" style="margin-bottom:6px">Your taste</div><div class="lbl" style="margin-bottom:10px">${lk} of 50 colors picked. Discover uses them to show you colors you'll like.</div><button class="btn" data-a="retake">${lk<50?'Continue picking':'Review your picks'}</button></div>
+<div class="sect card"><div class="row"><span style="width:10px;height:10px;border-radius:50%;background:#6EC98A;flex-shrink:0"></span><span class="h2">Saved on this phone</span></div><div class="lbl" style="margin-top:6px">${n} palette${n===1?'':'s'} · ${m} photo${m===1?'':'s'}${DB.db?'':' · photos last until you close this page'}</div><div class="lbl" style="margin-top:8px">For now, back up with <b style="color:var(--fg)">Copy my palettes</b> below and paste it into a note. Google Drive backup is next on the list.</div></div>
+<div class="sect"><div class="h2" style="margin-bottom:4px">Move or back up your palettes</div><div class="lbl" style="margin-bottom:10px">Copy your palettes, then paste them into ColorShare on another device. Photos stay on this device.</div><button class="btn" data-a="exportp">${ICON.copy}Copy my palettes</button><textarea id="impjson" placeholder="Paste copied palettes here" aria-label="Paste palettes to import" style="display:block;height:80px;margin-top:10px;padding:10px 12px;resize:vertical"></textarea><button class="btn" data-a="importp" style="margin-top:8px">Import pasted palettes</button></div>
 <div class="sect"><button class="btn ${armed?'warn':''}" data-a="reset">${armed?'Tap again to erase everything':'Reset prototype data'}</button></div>`}
 
-/* Build */
+/* ---------- Build ---------- */
 function buildHTML(){return`<div class="card"><div class="lbl" style="margin-bottom:8px">From your ${S.anchors.length} color${S.anchors.length===1?'':'s'}${S.anchors.length>5?' · best combinations of them':' · kept in every suggestion'}</div><div class="row" style="gap:3px">${S.anchors.map(h=>`<div style="flex:1;height:30px;border-radius:7px;background:${h}"></div>`).join('')}</div></div>
-<div class="row" style="margin:8px 0 6px"><span class="slab">Close</span><div class="rng"><input type="range" id="far" min="0" max="100" step="1" value="${S.far}" aria-label="Close or far hues"></div><span class="slab r">Far</span></div><div class="lbl" style="margin-bottom:16px">Close keeps your hues. Far brings in contrasting ones. Moving it makes a fresh set.</div>
+<div style="margin:8px 0 6px">${trk('far','Close hues','Far hues')}</div><div class="lbl" style="margin-bottom:16px">Close keeps your hues. Far brings in contrasting ones. Moving it makes a fresh set.</div>
 ${S.sugg.map((p,i)=>`<div class="card"><div class="h2" style="margin-bottom:10px">${esc(p.name)}</div><div class="pal">${p.colors.map(h=>`<div data-a="copy" data-v="${h}" style="background:${h}"></div>`).join('')}</div><div class="hexrow mono">${p.colors.map(h=>`<span>${h.slice(1)}</span>`).join('')}</div><div class="row"><button class="btn pri" data-a="usesugg" data-v="${i}">Use this</button><button class="btn" data-a="savesugg" data-v="${i}">Save as new</button><span class="sp"></span><button class="btn icon" data-a="sharesugg" data-v="${i}" aria-label="Share">${ICON.share}</button></div></div>`).join('')||'<div class="lbl">Add a color or two first.</div>'}
 <button class="btn" style="width:100%" data-a="moresugg">More palettes</button>`}
 
 /* ---------- sheets ---------- */
+function moHTML(){const mo=S.mo;return`<div class="sheet-bg"><div class="sheet"><div class="handle"></div><div class="row" style="margin-bottom:4px"><span class="h2 sp" style="font-size:20px">Match to surface</span><button class="btn sm ghost icon" data-a="moclose" aria-label="Close">${ICON.close}</button></div><div class="lbl" style="margin-bottom:10px">Tap the color to match. Hold your phone next to the real surface and slide each bar until they look the same.</div><div style="display:flex;gap:3px;margin-bottom:10px">${mo.colors.map((h,i)=>`<div class="stchip${i===mo.ti?' tgt':''}" style="background:${h};height:42px" data-a="moti" data-v="${i}" role="button" aria-label="Match ${h}"></div>`).join('')}</div>${matchPrev(mo.m)}<div style="margin-top:10px">${relPads('m')}</div><div class="row" style="margin-top:2px"><button class="btn big ghost" data-a="mreset">Reset</button><button class="btn big" style="flex:1" data-a="muse">Use this color</button></div><div class="row" style="margin-top:8px"><button class="btn big ghost" data-a="moclose">Cancel</button><button class="btn big pri" style="flex:1" data-a="modone">Done</button></div></div></div>`}
 function renderSheet2(){const o=$('ov2');
 if(S.chooser){o.innerHTML=`<div class="sheet-bg" data-a="chooseclose"><div class="sheet"><div class="handle"></div><div class="h2" style="font-size:20px;margin-bottom:14px">Scan colors</div><button class="choice" data-a="takephoto">${ICON.camera}<span><span class="h2" style="display:block">Take photo</span><span class="lbl">Opens your camera</span></span></button><button class="choice" data-a="chooselib">${ICON.library}<span><span class="h2" style="display:block">Photo library</span><span class="lbl">Photos and screenshots you already have</span></span></button><button class="btn big ghost" style="width:100%" data-a="chooseclose">Cancel</button></div></div>`;lockScroll();return}
 if(S.confirm){const c=S.confirm;o.innerHTML=`<div class="sheet-bg" data-a="cconfirm"><div class="sheet"><div class="handle"></div><div class="h2" style="font-size:20px">Save changes to ${esc(c.orig)}?</div><div class="lbl" style="margin:4px 0 14px">Overwrite replaces the original. Save as new keeps both.</div><div class="pal" style="height:46px;margin-bottom:18px">${c.colors.map(h=>`<div style="background:${h};cursor:default"></div>`).join('')}</div><button class="btn big pri" style="width:100%;margin-bottom:10px" data-a="overwrite">Overwrite</button><button class="btn big" style="width:100%;margin-bottom:6px" data-a="saveasnew">Save as new</button><button class="btn big ghost" style="width:100%" data-a="cconfirm">Cancel</button></div></div>`;lockScroll();return}
+if(S.mo){o.innerHTML=moHTML();lockScroll();return}
 o.innerHTML='';lockScroll()}
-function lockScroll(){document.body.style.overflow=(S.studio||S.confirm||S.chooser||S.viewer)?'hidden':''}
-function savePalette(rec,overwriteId){if(overwriteId){const i=S.saved.findIndex(p=>p.id===overwriteId);rec.name=uniqueName(rec.name,overwriteId);rec.id=overwriteId;rec.created=S.saved[i].created;S.saved[i]=rec}else{rec.name=uniqueName(rec.name);rec.id=uid();rec.created=Date.now();S.saved.unshift(rec)}if(!persist())toast('Storage is full. Delete a few palettes or photos.',3500);return rec}
-
-/* ---------- scan studio ---------- */
+function lockScroll(){document.body.style.overflow=(S.studio||S.confirm||S.chooser||S.viewer||S.mo)?'hidden':''}
+function savePalette(rec,overwriteId){if(overwriteId){const i=S.saved.findIndex(p=>p.id===overwriteId);rec.name=uniqueName(rec.name,overwriteId);rec.id=overwriteId;rec.created=S.saved[i].created;if(rec.fav===undefined)rec.fav=S.saved[i].fav;S.saved[i]=rec}else{rec.name=uniqueName(rec.name);rec.id=uid();rec.created=Date.now();S.saved.unshift(rec)}if(!persist())toast('Storage is full. Delete a few palettes or photos.',3500);return rec}
 function openFile(f){const url=URL.createObjectURL(f);const im=new Image();im.onload=()=>{openStudio({img:im});URL.revokeObjectURL(url)};im.onerror=()=>{toast('That image could not be opened. Try a JPEG or PNG.');URL.revokeObjectURL(url)};im.src=url}
-function openStudio(o){const im=o.img;const iw0=im.naturalWidth||im.width,ih0=im.naturalHeight||im.height;const sc=Math.min(1,1200/Math.max(iw0,ih0));const src=document.createElement('canvas');src.width=Math.round(iw0*sc);src.height=Math.round(ih0*sc);const sctx=src.getContext('2d',{willReadFrequently:true});sctx.drawImage(im,0,0,src.width,src.height);
-const s=o.scan||{};S.studio={src,sctx,iw:src.width,ih:src.height,photoId:o.photoId||null,editId:o.editId||null,z:s.z||1,cx:s.cx??.5,cy:s.cy??.5,k:s.k||6,added:(s.added||[]).map(a=>({...a})),off:[...(s.off||[])],light:s.light||0,bold:s.bold||0,name:o.name||'',tags:o.tags?[...o.tags]:[],source:o.source??null,auto:[],match:null,hinted:!!o.editId};S.studio.orig=JSON.stringify({z:S.studio.z,cx:S.studio.cx,cy:S.studio.cy,k:S.studio.k,added:S.studio.added,off:S.studio.off,light:S.studio.light,bold:S.studio.bold,name:S.studio.name,tags:S.studio.tags,source:S.studio.source});
-$('ov').innerHTML=`<div class="sheet-bg"><div class="sheet" id="sheet"><div class="handle"></div><div class="row" style="margin-bottom:10px"><span class="h2 sp" style="font-size:20px">${o.editId?'Edit scan':'New scan'}</span><button class="btn sm ghost" data-a="stclose" aria-label="Close">${ICON.close}</button></div><div style="position:relative"><div class="vp" id="vp"><canvas id="vpc"></canvas><div class="vphint" id="vphint">Pinch to zoom · drag to frame · press and hold to pick a color</div></div><div class="loupe" id="lp"><canvas id="lpc"></canvas></div><div class="loupetag" id="lpt"></div></div><div id="stdyn" style="margin-top:14px"></div></div></div>`;
-lockScroll();requestAnimationFrame(()=>{drawVP();runExtract();bindVP()})}
-function closeStudio(){S.studio=null;$('ov').innerHTML='';lockScroll()}
 function region(){const st=S.studio;const side=Math.min(st.iw,st.ih)/st.z;const cx=clamp(st.cx*st.iw,side/2,st.iw-side/2),cy=clamp(st.cy*st.ih,side/2,st.ih-side/2);st.cx=cx/st.iw;st.cy=cy/st.ih;return{side,x:cx-side/2,y:cy-side/2}}
-function drawVP(){const st=S.studio;if(!st)return;const cv=$('vpc');if(!cv)return;const W=cv.clientWidth,dpr=window.devicePixelRatio||1;if(cv.width!==Math.round(W*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(W*dpr)}const ctx=cv.getContext('2d');const r=region();ctx.drawImage(st.src,r.x,r.y,r.side,r.side,0,0,cv.width,cv.height);
-st.added.forEach(a=>{const px=(a.x*st.iw-r.x)/r.side*cv.width,py=(a.y*st.ih-r.y)/r.side*cv.height;if(px<0||py<0||px>cv.width||py>cv.height)return;ctx.beginPath();ctx.arc(px,py,9*dpr,0,Math.PI*2);ctx.fillStyle=a.hex;ctx.fill();ctx.lineWidth=2.5*dpr;ctx.strokeStyle='#fff';ctx.stroke()})}
 function sampleImg(x,y){const st=S.studio;const r=Math.max(1,Math.round(region().side/180));const x0=clamp(Math.round(x)-r,0,st.iw-1),y0=clamp(Math.round(y)-r,0,st.ih-1);const w=Math.max(1,Math.min(st.iw-x0,2*r+1)),h=Math.max(1,Math.min(st.ih-y0,2*r+1));const d=st.sctx.getImageData(x0,y0,w,h).data;let R=0,G=0,B=0,n=0;for(let i=0;i<d.length;i+=4){R+=lin(d[i]/255);G+=lin(d[i+1]/255);B+=lin(d[i+2]/255);n++}return toHex(gam(R/n),gam(G/n),gam(B/n))}
 function extractRegion(k){const st=S.studio;const r=region();const N=96;const t=document.createElement('canvas');t.width=N;t.height=N;const x=t.getContext('2d',{willReadFrequently:true});x.drawImage(st.src,r.x,r.y,r.side,r.side,0,0,N,N);const d=x.getImageData(0,0,N,N).data;const px=[];for(let i=0;i<d.length;i+=4)px.push(rgbOk(d[i]/255,d[i+1]/255,d[i+2]/255));
 const K=k+3;const mean=[0,1,2].map(j=>px.reduce((s,p)=>s+p[j],0)/px.length);let md=px.map(p=>dist(p,mean));const cs=[];for(let n=0;n<K;n++){let bi=0;for(let i=1;i<px.length;i++)if(md[i]>md[bi])bi=i;cs.push([...px[bi]]);for(let i=0;i<px.length;i++){const dd=dist(px[i],cs[n]);md[i]=n===0?dd:Math.min(md[i],dd)}}
 const cnt=new Array(K).fill(0);for(let it=0;it<12;it++){const sum=cs.map(()=>[0,0,0,0]);for(const p of px){let b=0,bd=1e9;for(let j=0;j<K;j++){const c2=cs[j];const dd=(p[0]-c2[0])**2+(p[1]-c2[1])**2+(p[2]-c2[2])**2;if(dd<bd){bd=dd;b=j}}const s=sum[b];s[0]+=p[0];s[1]+=p[1];s[2]+=p[2];s[3]++}sum.forEach((s,j)=>{if(s[3])cs[j]=[s[0]/s[3],s[1]/s[3],s[2]/s[3]];cnt[j]=s[3]})}
 const cl=cs.map((o,j)=>({o,n:cnt[j]})).sort((a,b)=>b.n-a.n);const mg=[];for(const c of cl){const m=mg.find(z=>dist(z.o,c.o)<6);if(m){const t2=m.n+c.n;if(t2)m.o=m.o.map((v,j)=>(v*m.n+c.o[j]*c.n)/t2);m.n=t2}else mg.push({o:[...c.o],n:c.n})}
 return mg.filter(c=>c.n/px.length>=0.012).sort((a,b)=>b.n-a.n).slice(0,k).map(c=>({hex:okHex(c.o),pct:Math.round(c.n/px.length*100)}))}
-let exT;function runExtract(delay){clearTimeout(exT);exT=setTimeout(()=>{if(!S.studio)return;S.studio.auto=extractRegion(S.studio.k);if(S.studio.match)return;renderStudio()},delay||0)}
 function stLists(){const st=S.studio;const off=new Set(st.off);const seen=new Set();let all=[...st.added.map(a=>({hex:a.hex,man:true,pct:100})),...st.auto.map(c=>({hex:c.hex,man:false,pct:c.pct}))].filter(c=>seen.has(c.hex)?false:(seen.add(c.hex),true));let inc=all.filter(c=>!off.has(c.hex));if(inc.length>12){const man=inc.filter(c=>c.man),au=inc.filter(c=>!c.man).sort((a,b)=>b.pct-a.pct);inc=[...man,...au.slice(0,Math.max(0,12-man.length))]}const sortL=a=>a.sort((x,y)=>Lof(x.hex)-Lof(y.hex));return{all:sortL(all),inc:sortL(inc),incSet:new Set(inc.map(c=>c.hex))}}
 const stFinal=()=>{const st=S.studio;return tone(stLists().inc.map(c=>c.hex),st.light,st.bold)};
 function stNameInput(){const el=$('stn');if(el)S.studio.name=el.value;return S.studio.name.trim()}
-function renderStudio(){const st=S.studio;if(!st)return;const host=$('stdyn');if(!host)return;stNameInput();
-if(st.match){const m=st.match,adj=lchHex(m.L,m.C,m.h);host.innerHTML=`<div class="h2" style="margin-bottom:4px">Match to surface</div><div class="lbl" style="margin-bottom:12px">Hold your phone next to the real surface. Slide along each bar until they match.</div><div id="msw" style="height:190px;border-radius:14px;background:${adj}"></div><div class="row" style="margin:10px 0 14px"><div style="width:46px;height:24px;border-radius:6px;background:${m.orig}"></div><span class="lbl">From photo</span><span class="sp"></span><span class="mono" id="mhex" style="font-size:13px;color:var(--fg)">${adj}</span></div>
-<div class="pad" data-pad="light"><span>Lighter</span><span class="pmid"></span><span class="knob"></span><span>Darker</span></div><div class="pad" data-pad="warm"><span>Warmer</span><span class="pmid"></span><span class="knob"></span><span>Cooler</span></div><div class="pad" data-pad="chroma"><span>More color</span><span class="pmid"></span><span class="knob"></span><span>Less color</span></div>
-<div class="row" style="margin-top:6px"><button class="btn big ghost" data-a="matchback">Back</button><button class="btn big ghost" data-a="matchreset">Reset</button><button class="btn big pri" style="flex:1" data-a="matchuse">Use this color</button></div>`;bindPads();return}
-const L=stLists();const fin=tone(L.inc.map(c=>c.hex),st.light,st.bold);const ti=new Map(L.inc.map((c,i)=>[c.hex,fin[i]]));const last=st.added[st.added.length-1];
-host.innerHTML=`<div style="display:flex;gap:3px">${L.all.map(c=>{const on=L.incSet.has(c.hex);return`<div class="stchip${on?'':' off'}" role="button" aria-label="${on?'Leave out':'Include'} ${c.hex}" data-a="sttoggle" data-v="${c.hex}" style="background:${on?ti.get(c.hex):c.hex}">${c.man?'<span class="dot"></span>':''}</div>`}).join('')||'<div class="empty" style="height:60px">Reading colors…</div>'}</div>
-<div class="row" style="margin-top:6px"><span class="lbl sp">${L.inc.length} of 12 · tap to leave out · <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#fff;margin:0 3px"></span>picked by you</span><button class="btn sm icon" data-a="streset" aria-label="Reset to how it was">${ICON.reset}</button><button class="btn sm icon" data-a="stshare" aria-label="Share palette">${ICON.share}</button></div>
-${last?`<div class="row" style="margin-top:12px;padding:8px;border-radius:12px;background:var(--s2)"><div style="width:30px;height:30px;border-radius:8px;background:${last.hex};flex-shrink:0"></div><span class="mono" style="color:var(--fg)">${last.hex}</span><span class="sp"></span><button class="btn sm" data-a="matchopen">Match to surface</button><button class="btn sm ghost icon" data-a="unpick" aria-label="Remove last picked color">${ICON.close}</button></div>`:''}
-<div class="row" style="margin-top:16px"><span class="slab">Colors</span><div class="rng"><input type="range" id="stk" min="3" max="12" step="1" value="${st.k}" aria-label="Number of colors"></div><span class="slab r" style="width:28px">${st.k}</span></div>
-<div style="margin-top:10px">${snapRange('stl',Math.round(st.light*100),'Darker','Lighter','Lighter or darker')}<div style="height:6px"></div>${snapRange('stb',Math.round(st.bold*100),'Softer','Bolder','Softer or bolder')}</div>
-<div class="row" style="margin-top:14px"><input type="text" id="stn" class="name" value="${esc(st.name)}" placeholder="${esc(baseName(fin)||'Name your palette')}" aria-label="Palette name"><button class="btn sm ghost" data-a="stauto">Auto</button></div>${srcField(st.source,'s',true)}${tagsHTML(st.tags,'s')}
-<div class="row" style="margin-top:14px"><button class="btn big ghost" data-a="stclose">Cancel</button><button class="btn big pri" style="flex:1" data-a="stsave">${st.editId?'Done':'Save palette'}</button></div>`}
-function repaintStudioTones(){const st=S.studio;const L=stLists();const fin=tone(L.inc.map(c=>c.hex),st.light,st.bold);const m=new Map(L.inc.map((c,i)=>[c.hex,fin[i]]));document.querySelectorAll('.stchip').forEach(el=>{if(m.has(el.dataset.v))el.style.background=m.get(el.dataset.v)});const n=$('stn');if(n)n.placeholder=baseName(fin)}
-/* drag surfaces for Match to surface: slide immediately, no hold */
-function bindPads(){document.querySelectorAll('.pad').forEach(pad=>{let x0=null,base=null;const key=pad.dataset.pad;const knob=pad.querySelector('.knob');
-const start=x=>{const m=S.studio.match;x0=x;base={L:m.L,C:m.C,h:m.h};pad.classList.add('act');move(x)};
-const move=x=>{if(x0==null)return;const m=S.studio.match;const r=pad.getBoundingClientRect();const dx=x-x0;knob.style.left=clamp(x-r.left,8,r.width-8)+'px';
-if(key==='light')m.L=clamp(base.L-dx*0.0008,0.06,0.98);
-if(key==='warm'){const steps=dx*0.12;m.h=base.h;const t=steps<0?60:250;const d=((t-base.h+540)%360)-180;m.h=base.h+Math.sign(d)*Math.min(Math.abs(d),Math.abs(steps));m.C=base.C<0.02?base.C+Math.min(0.03,Math.abs(dx)*0.0002):base.C}
-if(key==='chroma')m.C=Math.max(0,base.C-dx*0.0004);
-const adj=lchHex(m.L,m.C,m.h);$('msw').style.background=adj;$('mhex').textContent=adj};
-const end=()=>{x0=null;pad.classList.remove('act')};
-pad.addEventListener('touchstart',e=>{e.preventDefault();start(e.touches[0].clientX)},{passive:false});pad.addEventListener('touchmove',e=>{e.preventDefault();move(e.touches[0].clientX)},{passive:false});pad.addEventListener('touchend',end);pad.addEventListener('touchcancel',end);
-pad.addEventListener('mousedown',e=>{start(e.clientX);const mm=ev=>move(ev.clientX);const mu=()=>{end();window.removeEventListener('mousemove',mm);window.removeEventListener('mouseup',mu)};window.addEventListener('mousemove',mm);window.addEventListener('mouseup',mu)})})}
 /* photo gestures: touch events on phones (most reliable on iPhone), mouse on desktop */
 function bindVP(){const vp=$('vp');if(!vp)return;let g=null;const lp=$('lp'),lpt=$('lpt'),lpc=$('lpc');
 const W=()=>vp.clientWidth;const toImg=(px,py)=>{const r=region();return[r.x+px/W()*r.side,r.y+py/W()*r.side]};
@@ -286,7 +340,7 @@ const[x,y]=pts[0];if(g.mode==='pend'){g.lx=x;g.ly=y;if(Math.hypot(x-g.sx,y-g.sy)
 if(g.mode==='pan'){const side=region().side;st.cx=g.cx-(x-g.sx)/W()*side/st.iw;st.cy=g.cy-(y-g.sy)/W()*side/st.ih;drawVP();runExtract(140)}
 else if(g.mode==='loupe'){g.lx=x;g.ly=y;loupeAt(x,y)}}
 function up(remaining,cancelled){const st=S.studio;if(!g||!st)return;if(g.t)clearTimeout(g.t);
-if(g.mode==='loupe'){hideLoupe();if(!cancelled){const L=stLists();if(L.inc.length>=12&&!st.added.some(a=>a.hex===g.hex))toast('This palette is full at 12 colors');else if(!st.added.some(a=>a.hex===g.hex)){st.added.push({hex:g.hex,x:g.ix/st.iw,y:g.iy/st.ih});st.off=st.off.filter(h=>h!==g.hex);st.match=null;drawVP();renderStudio()}}g=null;return}
+if(g.mode==='loupe'){hideLoupe();if(!cancelled&&st.match){const[L,C,h]=hexLch(g.hex);Object.assign(st.match,{orig:g.hex,L,C,h});renderStudio()}else if(!cancelled){const L=stLists();if(L.inc.length>=12&&!st.added.some(a=>a.hex===g.hex))toast('This palette is full at 12 colors');else if(!st.added.some(a=>a.hex===g.hex)){st.added.push({hex:g.hex,x:g.ix/st.iw,y:g.iy/st.ih});st.off=st.off.filter(h=>h!==g.hex);drawVP();renderStChips()}}g=null;return}
 if(g.mode==='pinch'){if(remaining.length===1){g={mode:'idle'}}else{g=null;runExtract(0)}return}
 if(g.mode==='pend'&&!cancelled&&!st.hinted){st.hinted=true;toast('Press and hold to pick a color')}
 if(g.mode==='pan')runExtract(0);if(!remaining.length)g=null}
@@ -299,14 +353,49 @@ vp.addEventListener('gesturestart',e=>e.preventDefault());vp.addEventListener('c
 vp.addEventListener('mousedown',e=>{const p=[rel(e.clientX,e.clientY)];down(p);const mm=ev=>move([rel(ev.clientX,ev.clientY)]);const mu=()=>{up([],false);window.removeEventListener('mousemove',mm);window.removeEventListener('mouseup',mu)};window.addEventListener('mousemove',mm);window.addEventListener('mouseup',mu)});
 vp.addEventListener('wheel',e=>{e.preventDefault();const st=S.studio;st.z=clamp(st.z*(e.deltaY<0?1.08:1/1.08),1,10);drawVP();runExtract(160)},{passive:false})}
 document.addEventListener('gesturestart',e=>{if(S.studio)e.preventDefault()});
+/* ---------- scan studio ---------- */
+const snapSt=()=>{const s=S.studio;return{z:s.z,cx:s.cx,cy:s.cy,k:s.k,added:s.added,off:s.off,light:s.light,bold:s.bold,name:s.name,tags:s.tags}};
+function openStudio(o){const im=o.img;const iw0=im.naturalWidth||im.width,ih0=im.naturalHeight||im.height;const sc=Math.min(1,1200/Math.max(iw0,ih0));const src=document.createElement('canvas');src.width=Math.round(iw0*sc);src.height=Math.round(ih0*sc);const sctx=src.getContext('2d',{willReadFrequently:true});sctx.drawImage(im,0,0,src.width,src.height);
+const s=o.scan||{};S.studio={src,sctx,iw:src.width,ih:src.height,photoId:o.photoId||null,editId:o.editId||null,z:s.z||1,cx:s.cx??.5,cy:s.cy??.5,k:s.k||6,added:(s.added||[]).map(a=>({...a})),off:[...(s.off||[])],light:s.light||0,bold:s.bold||0,name:o.name||'',tags:o.tags?[...o.tags]:[],auto:[],match:null,hinted:!!o.editId,wantMatch:!!o.wantMatch,first:true};S.studio.orig=JSON.stringify(snapSt());
+$('ov').innerHTML=`<div class="sheet-bg"><div class="sheet" id="sheet"><div class="handle"></div><div class="row" style="margin-bottom:8px"><span class="h2 sp" style="font-size:20px" id="sttitle">${o.wantMatch?'Match to surface':o.editId?'Edit scan':'New scan'}</span><button class="btn sm ghost icon" data-a="stclose" aria-label="Close">${ICON.close}</button></div><div class="vpw${o.wantMatch?' short':''}" id="vpw"><div class="vp" id="vp"><canvas id="vpc"></canvas><div class="vphint" id="vphint">${o.wantMatch?'Press and hold to sample a spot':'Pinch to zoom · drag to frame · press and hold to pick a color'}</div></div><div class="loupe" id="lp"><canvas id="lpc"></canvas></div><div class="loupetag" id="lpt"></div></div><div id="stdyn" style="margin-top:12px"><div class="empty" style="height:54px">Reading colors…</div></div></div></div>`;
+lockScroll();requestAnimationFrame(()=>{drawVP();runExtract();bindVP()})}
+function closeStudio(){S.studio=null;$('ov').innerHTML='';lockScroll()}
+function drawVP(){const st=S.studio;if(!st)return;const cv=$('vpc');if(!cv)return;const W=cv.clientWidth,dpr=window.devicePixelRatio||1;if(!W)return;if(cv.width!==Math.round(W*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(W*dpr)}const ctx=cv.getContext('2d');const r=region();ctx.drawImage(st.src,r.x,r.y,r.side,r.side,0,0,cv.width,cv.height);
+st.added.forEach(a=>{if(a.x==null)return;const px=(a.x*st.iw-r.x)/r.side*cv.width,py=(a.y*st.ih-r.y)/r.side*cv.height;if(px<0||py<0||px>cv.width||py>cv.height)return;ctx.beginPath();ctx.arc(px,py,9*dpr,0,Math.PI*2);ctx.fillStyle=a.hex;ctx.fill();ctx.lineWidth=2.5*dpr;ctx.strokeStyle='#fff';ctx.stroke()})}
+let exT;function runExtract(delay){clearTimeout(exT);exT=setTimeout(()=>{const st=S.studio;if(!st)return;st.auto=extractRegion(st.k);
+if(st.first){st.first=false;if(st.wantMatch){st.wantMatch=false;const L=stLists();if(L.inc.length){startMatch(L.inc[0].hex);return}}renderStudio();return}
+if(st.match)renderMatchChips();else renderStChips()},delay||0)}
+function stChipsHTML(){const st=S.studio;const L=stLists();const fin=tone(L.inc.map(c=>c.hex),st.light,st.bold);const ti=new Map(L.inc.map((c,i)=>[c.hex,fin[i]]));
+return`<div style="display:flex;gap:3px">${L.all.map(c=>{const on=L.incSet.has(c.hex);return`<div class="stchip${on?'':' off'}" role="button" aria-label="${on?'Leave out':'Include'} ${c.hex}" data-a="sttoggle" data-v="${c.hex}" style="background:${on?ti.get(c.hex):c.hex}">${c.man?'<span class="dot"></span>':''}</div>`}).join('')||'<div class="empty" style="height:54px">No colors found</div>'}</div>
+<div class="row" style="margin-top:6px"><span class="lbl sp">${L.inc.length} of 12 · tap to leave out${st.added.length?' · <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#fff;margin:0 2px"></span> picked by you':''}</span>${st.added.length?'<button class="btn sm ghost" data-a="unpick">Undo pick</button>':''}<button class="btn sm icon round" data-a="streset" aria-label="Reset to how it was">${ICON.reset}</button><button class="btn sm icon round" data-a="stshare" aria-label="Share palette">${ICON.share}</button></div>`}
+function renderStChips(){const c=$('stc');if(c)c.innerHTML=stChipsHTML();const n=$('stn');if(n)n.placeholder=baseName(stFinal())||'Name your palette'}
+function matchChipsHTML(){const st=S.studio;return stLists().inc.map(c=>`<div class="stchip${c.hex===st.match.tgt?' tgt':''}" style="background:${c.hex};height:40px" data-a="mtgt" data-v="${c.hex}" role="button" aria-label="Match ${c.hex}"></div>`).join('')}
+function renderMatchChips(){const el=$('mchips');if(el)el.innerHTML=matchChipsHTML()}
+function renderStudio(){const st=S.studio;if(!st)return;const host=$('stdyn');if(!host)return;stNameInput();
+const w=$('vpw');const sh=!!st.match;if(w&&w.classList.contains('short')!==sh){w.classList.toggle('short',sh);requestAnimationFrame(drawVP)}
+const t=$('sttitle');if(t)t.textContent=st.match?'Match to surface':st.editId?'Edit scan':'New scan';
+if(st.match){host.innerHTML=`<div class="lbl" style="margin-bottom:8px">Tap the color to match. Hold your phone next to the surface and slide each bar. Press and hold the photo to sample another spot.</div><div id="mchips" style="display:flex;gap:3px;margin-bottom:10px">${matchChipsHTML()}</div>${matchPrev(st.match)}<div style="margin-top:10px">${relPads('m')}</div><div class="row" style="margin-top:2px"><button class="btn big ghost" data-a="matchback">Back</button><button class="btn big ghost" data-a="mreset">Reset</button><button class="btn big pri" style="flex:1" data-a="muse">Use this color</button></div>`;return}
+const fin=stFinal();
+host.innerHTML=`<div id="stc">${stChipsHTML()}</div><div style="margin-top:12px">${trk('stk','Fewer','More',{num:st.k})}${trk('stl','Lighter','Darker',{mid:1})}${trk('stb','Softer','Bolder',{mid:1})}</div>
+<div class="row" style="margin-top:6px"><input type="text" id="stn" class="name" value="${esc(st.name)}" placeholder="${esc(baseName(fin)||'Name your palette')}" aria-label="Palette name" autocomplete="off"><button class="btn sm ghost" data-a="stauto">Auto</button></div>${srcTagRow(S.creator.toUpperCase()+' · Scanned',st.tags,'s')}
+<div class="row" style="margin-top:14px"><button class="btn big ghost" data-a="stclose">Cancel</button><button class="btn big pri" style="flex:1" data-a="stsave">${st.editId?'Done':'Save palette'}</button></div>`}
+function repaintStudioTones(){const st=S.studio;const L=stLists();const fin=tone(L.inc.map(c=>c.hex),st.light,st.bold);const m=new Map(L.inc.map((c,i)=>[c.hex,fin[i]]));document.querySelectorAll('#stc .stchip').forEach(el=>{if(m.has(el.dataset.v))el.style.background=m.get(el.dataset.v)});const n=$('stn');if(n)n.placeholder=baseName(fin)||'Name your palette'}
+function startMatch(hex){const st=S.studio;stNameInput();const[L,C,h]=hexLch(hex);st.match={tgt:hex,orig:hex,L,C,h,big:false};renderStudio()}
+/* Use this color: replaces the colour you were matching (a picked colour changes in place,
+   an automatic one is left out and the matched colour is added in its place) */
+function studioUse(){const st=S.studio,m=st.match;const adj=lchHex(m.L,m.C,m.h);const a=st.added.find(x=>x.hex===m.tgt);if(a)a.hex=adj;else{if(m.tgt&&!st.off.includes(m.tgt))st.off.push(m.tgt);if(!st.added.some(x=>x.hex===adj))st.added.push({hex:adj,x:null,y:null})}st.match=null;drawVP();renderStudio();toast('Color updated')}
 async function saveStudio(overwrite){const st=S.studio;const colors=stFinal();if(!colors.length){toast('Leave at least one color in');return}const typed=stNameInput();
 let pid=st.photoId;if(!pid){pid=uid();let q=0.82,data=st.src.toDataURL('image/jpeg',q);while(data.length>150000&&q>0.5){q-=0.08;data=st.src.toDataURL('image/jpeg',q)}const t=document.createElement('canvas');t.width=t.height=240;const side=Math.min(st.iw,st.ih);t.getContext('2d').drawImage(st.src,(st.iw-side)/2,(st.ih-side)/2,side,side,0,0,240,240);const ok=await DB.put({id:pid,data,thumb:t.toDataURL('image/jpeg',0.8),created:Date.now()});if(!ok&&!DB.db)toast('Photo kept for this visit only',2500)}
-const rec={name:typed||baseName(colors),colors,src:'Scanned',tags:[...st.tags],mine:true,source:st.source||null,photoId:pid,scan:{z:st.z,cx:st.cx,cy:st.cy,k:st.k,added:st.added,off:st.off,light:st.light,bold:st.bold}};
+const rec={name:typed||baseName(colors),colors,src:'Scanned',tags:[...st.tags],mine:true,source:null,photoId:pid,scan:{z:st.z,cx:st.cx,cy:st.cy,k:st.k,added:st.added,off:st.off,light:st.light,bold:st.bold}};
 const saved=savePalette(rec,overwrite?st.editId:null);closeStudio();S.confirm=null;renderSheet2();go('pal');toast('Saved as '+saved.name)}
-async function editScanPalette(p){const im=await photoImg(p.photoId);if(!im){toast('Photo not found on this phone. Editing colors only.');startEditDraft(p);return}openStudio({img:im,photoId:p.photoId,editId:p.id,scan:p.scan,name:p.name,tags:p.tags,source:p.source})}
-function startEditDraft(p){S.draft={id:p.id,base:[...p.colors],light:0,bold:0,name:p.name,named:true,src:p.src,tags:[...(p.tags||[])],source:p.source,mine:p.mine};snapDraft();S.menu=null;S.closedGroups.delete('src:'+srcOf(p));if(S.view!=='pal')go('pal');else renderMain();setTimeout(()=>{const el=document.querySelector('[data-host=draft]');if(el)el.scrollIntoView({block:'center',behavior:'smooth'})},30)}
+async function editScanPalette(p,wantMatch){const im=await photoImg(p.photoId);if(!im){if(wantMatch)return false;toast('Photo not found on this phone. Editing colors only.');startEditDraft(p);return}openStudio({img:im,photoId:p.photoId,editId:p.id,scan:p.scan,name:p.name,tags:p.tags,wantMatch});return true}
+function startEditDraft(p){S.draft={id:p.id,base:[...p.colors],light:0,bold:0,name:p.name,named:true,src:p.src,tags:[...(p.tags||[])],source:p.source,mine:p.mine,sel:null};snapDraft();S.menu=null;S.closedGroups.delete('src:'+srcOf(p));if(S.view!=='pal')go('pal');else renderMain();setTimeout(()=>{const el=document.querySelector('[data-host=draft]');if(el)el.scrollIntoView({block:'center',behavior:'smooth'})},30)}
 
 /* ---------- actions ---------- */
+const findP=v=>S.saved.find(x=>x.id===v);
+function keepDraftName(){const el=$('dname');if(el&&el.value.trim()){S.draft.name=el.value;S.draft.named=true}}
+function resetMatch(m){const[L,C,h]=hexLch(m.orig);Object.assign(m,{L,C,h})}
+const reMatch=()=>{if(S.studio&&S.studio.match)renderStudio();else renderSheet2()};
 const A={
 go:v=>{S.armed=null;go(v)},
 back:()=>go(S.prev),
@@ -314,107 +403,142 @@ scan:()=>{S.chooser=true;renderSheet2()},
 chooseclose:()=>{S.chooser=false;renderSheet2()},
 takephoto:()=>{S.chooser=false;renderSheet2();const c=$('cam');c.value='';c.click()},
 chooselib:()=>{S.chooser=false;renderSheet2();const f=$('file');f.value='';f.click()},
+/* Discover */
+starthere:()=>{S.setupOpen=true;if(!S.pool.length)S.pool=[...setupBatch(),...setupBatch()];renderMain();window.scrollTo(0,0)},
 like:v=>{const i=S.likeHex.indexOf(v);if(i>=0)S.likeHex.splice(i,1);else S.likeHex.push(v);S.likes=S.likeHex.map(hexOk);persist();document.querySelectorAll(`#setgrid .sw[data-v="${v}"]`).forEach(el=>el.classList.toggle('sel',i<0));const b=$('sbar');if(b)b.innerHTML=setupBarHTML()},
-done50:()=>{const n=S.likeHex.length;if(n<50){toast('Pick '+(50-n)+' more');return}S.setup=false;persist();S.stream=streamBatch(60);renderMain();window.scrollTo(0,0);toast('Discover now follows your taste')},
-skip:()=>{S.setup=false;persist();S.stream=streamBatch(60);renderMain();window.scrollTo(0,0)},
-retake:()=>{S.setup=true;persist();if(!S.pool.length)S.pool=[...setupBatch(),...setupBatch()];go('discover')},
-create:()=>{newDraft('Discover');renderMain();toast('Tap colors to add them')},
+done50:()=>{const n=S.likeHex.length;S.setupOpen=false;S.stream=streamBatch(60);renderMain();window.scrollTo(0,0);toast(n>=50?'Discover now follows your taste':n?`${n} picks saved. Carry on any time from Start here.`:'Pick colors any time from Start here')},
+retake:()=>{S.setupOpen=true;if(!S.pool.length)S.pool=[...setupBatch(),...setupBatch()];go('discover')},
+hue:v=>{if(v==='all')S.hues.clear();else if(S.hues.has(v))S.hues.delete(v);else S.hues.add(v);persist();S.stream=streamBatch(60);renderMain()},
+sort:v=>{S.sort=v;persist();S.stream=sortCols([...S.stream]);renderMain()},
+create:()=>{newDraft('Discover');renderMain();window.scrollTo(0,0);toast('Tap colors to add them')},
 createp:()=>{newDraft('Created');renderMain()},
 pick:v=>addToDraft(v),
+/* editor */
 autoname:()=>{const el=$('dname');if(el){el.value=autoName();S.draft.name=el.value;S.draft.named=true}},
-build:()=>{const c=draftCols();if(!c.length){toast('Add at least one color first');return}const el=$('dname');if(el&&el.value.trim()){S.draft.name=el.value;S.draft.named=true}S.anchors=c;buildSugg();go('build')},
-adddisc:()=>{const el=$('dname');if(el&&el.value.trim()){S.draft.name=el.value;S.draft.named=true}if(S.setup){S.setup=false;persist()}if(!S.stream.length)S.stream=streamBatch(60);go('discover');toast('Tap colors to add them')},
+build:()=>{const c=draftCols();if(!c.length){toast('Add at least one color first');return}keepDraftName();S.anchors=c;buildSugg();go('build')},
+adddisc:()=>{keepDraftName();S.setupOpen=false;if(!S.stream.length)S.stream=streamBatch(60);go('discover');toast('Tap colors to add them')},
 sharedraft:()=>{const c=draftCols();if(!c.length){toast('Add a color first');return}sharePal(draftName(),c)},
-clearall:()=>{if(!S.draft.base.length)return;if(!arm('clear')){refreshDraft();return}S.draft.base=[];S.draft.light=S.draft.bold=0;refreshDraft()},
+clearall:()=>{if(!S.draft.base.length)return;if(!arm('clear')){refreshDraft();return}S.draft.base=[];S.draft.sel=null;S.draft.light=S.draft.bold=0;refreshDraft()},
+chipdel:()=>{const d=S.draft;if(!d||d.sel==null)return;d.base.splice(d.sel,1);d.sel=null;refreshDraft()},
+chipdone:()=>{if(S.draft){S.draft.sel=null;refreshDraft()}},
 cancel:()=>{const wasEdit=S.draft&&S.draft.id;S.draft=null;renderMain();if(wasEdit)toast('Changes discarded')},
-savenew:()=>{const c=draftCols();if(!c.length){toast('Add at least one color first');return}const r=savePalette({name:draftName(),colors:c,src:S.draft.src||'Created',tags:[...(S.draft.tags||[])],mine:true,source:S.draft.source||null});S.draft=null;go('pal');toast('Saved as '+r.name)},
-done:()=>{const c=draftCols();if(!c.length){toast('A palette needs at least one color');return}S.draft.pendingName=draftName();const p=S.saved.find(x=>x.id===S.draft.id);S.confirm={kind:'draft',orig:p?p.name:'palette',colors:c};renderSheet2()},
-overwrite:()=>{const c=S.confirm;if(!c)return;if(c.kind==='studio'){saveStudio(true);return}const p=S.saved.find(x=>x.id===S.draft.id);const r=savePalette({...p,name:S.draft.pendingName,colors:c.colors,tags:[...(S.draft.tags||[])],source:S.draft.source||(p.mine?null:p.source)},S.draft.id);S.draft=null;S.confirm=null;renderSheet2();go('pal');toast('Saved as '+r.name)},
-saveasnew:()=>{const c=S.confirm;if(!c)return;if(c.kind==='studio'){saveStudio(false);return}const p=S.saved.find(x=>x.id===S.draft.id)||{};const r=savePalette({name:S.draft.pendingName,colors:c.colors,src:p.mine&&p.src?p.src:'Created',tags:[...(S.draft.tags||[])],mine:true,source:p.mine?(S.draft.source||null):null});S.draft=null;S.confirm=null;renderSheet2();go('pal');toast('Saved as '+r.name)},
+savenew:()=>{const c=draftCols();if(!c.length){toast('Add at least one color first');return}const r=savePalette({name:draftName(),colors:c,src:S.draft.src||'Created',tags:[...(S.draft.tags||[])],mine:true,source:null});S.draft=null;go('pal');toast('Saved as '+r.name)},
+done:()=>{const c=draftCols();if(!c.length){toast('A palette needs at least one color');return}S.draft.pendingName=draftName();const p=findP(S.draft.id);S.confirm={kind:'draft',orig:p?p.name:'palette',colors:c};renderSheet2()},
+resetdraft:()=>{if(!S.draft||!S.draft.orig)return;Object.assign(S.draft,JSON.parse(S.draft.orig));S.draft.sel=null;const el=$('dname');if(el)el.value=S.draft.named?S.draft.name:'';refreshDraft();toast('Back to how it was')},
+overwrite:()=>{const c=S.confirm;if(!c)return;if(c.kind==='studio'){saveStudio(true);return}
+if(c.kind==='mo'){const p=findP(S.mo.id);const r=savePalette({...p,colors:c.colors},p.id);S.mo=null;S.confirm=null;renderSheet2();renderMain();toast('Saved '+r.name);return}
+const p=findP(S.draft.id);const r=savePalette({...p,name:S.draft.pendingName,colors:c.colors,tags:[...(S.draft.tags||[])]},S.draft.id);S.draft=null;S.confirm=null;renderSheet2();go('pal');toast('Saved as '+r.name)},
+saveasnew:()=>{const c=S.confirm;if(!c)return;if(c.kind==='studio'){saveStudio(false);return}
+if(c.kind==='mo'){const p=findP(S.mo.id)||{};const r=savePalette({name:p.name||baseName(c.colors),colors:c.colors,src:p.mine&&p.src?p.src:'Created',tags:[...(p.tags||[])],mine:true,source:null});S.mo=null;S.confirm=null;renderSheet2();go('pal');toast('Saved as '+r.name);return}
+const p=findP(S.draft.id)||{};const r=savePalette({name:S.draft.pendingName,colors:c.colors,src:p.mine&&p.src?p.src:'Created',tags:[...(S.draft.tags||[])],mine:true,source:null});S.draft=null;S.confirm=null;renderSheet2();go('pal');toast('Saved as '+r.name)},
 cconfirm:()=>{S.confirm=null;renderSheet2()},
-usesugg:v=>{const p=S.sugg[+v];if(!S.draft)newDraft('Generated');S.draft.base=[...p.colors];S.draft.light=S.draft.bold=0;go(S.prev);toast('Loaded into your palette')},
+/* build */
+usesugg:v=>{const p=S.sugg[+v];if(!S.draft)newDraft('Generated');S.draft.base=[...p.colors];S.draft.sel=null;S.draft.light=S.draft.bold=0;go(S.prev);toast('Loaded into your palette')},
 savesugg:v=>{const p=S.sugg[+v];const r=savePalette({name:p.name,colors:[...p.colors],src:'Generated',tags:[],mine:true,source:null});toast('Saved as '+r.name)},
 sharesugg:v=>{const p=S.sugg[+v];sharePal(p.name,p.colors)},
 moresugg:()=>{buildSugg();renderMain()},
+/* palettes */
 copy:v=>copy(v),
 menu:v=>{S.menu=S.menu===v?null:v;if(S.viewer)renderViewer();else renderMain()},
-copyhex:v=>{const p=S.saved.find(x=>x.id===v);if(p)copy(p.colors.join(', '),'Copied hex codes');S.menu=null;S.viewer?renderViewer():renderMain()},
-copycss:v=>{const p=S.saved.find(x=>x.id===v);if(p)copy(cssOf(p.name,p.colors),'Copied website code');S.menu=null;S.viewer?renderViewer():renderMain()},
+copyhex:v=>{const p=findP(v);if(p)copy(p.colors.join(', '),'Copied hex codes');S.menu=null;S.viewer?renderViewer():renderMain()},
+copycss:v=>{const p=findP(v);if(p)copy(cssOf(p.name,p.colors),'Copied website code');S.menu=null;S.viewer?renderViewer():renderMain()},
 paintsoon:()=>toast('Paint matching is coming next'),
-share:v=>{const p=S.saved.find(x=>x.id===v);if(p)sharePal(p.name,p.colors)},
-edit:v=>{const p=S.saved.find(x=>x.id===v);if(!p)return;S.armed=null;if(p.photoId)editScanPalette(p);else startEditDraft(p)},
-del:v=>{if(!arm('del'+v)){renderMain();return}const p=S.saved.find(x=>x.id===v);S.saved=S.saved.filter(x=>x.id!==v);if(S.draft&&S.draft.id===v)S.draft=null;persist();renderMain();toast('Deleted '+(p?p.name:''))},
-togglephoto:v=>{if(S.collapsed.has(v))S.collapsed.delete(v);else S.collapsed.add(v);persist();renderMain()},
+share:v=>{const p=findP(v);if(p)sharePal(p.name,p.colors)},
+edit:v=>{const p=findP(v);if(!p)return;S.armed=null;if(p.photoId)editScanPalette(p);else startEditDraft(p)},
+del:v=>{if(!arm('del'+v)){renderMain();return}const p=findP(v);S.saved=S.saved.filter(x=>x.id!==v);if(S.draft&&S.draft.id===v)S.draft=null;persist();renderMain();toast('Deleted '+(p?p.name:''))},
+togglephoto:v=>{if(S.openPh.has(v))S.openPh.delete(v);else S.openPh.add(v);persist();renderMain()},
 group:v=>{if(S.closedGroups.has(v))S.closedGroups.delete(v);else S.closedGroups.add(v);persist();renderMain()},
-import:()=>{const v=$('imp').value.trim();const raw=v.includes('/palette/')?(v.split('/palette/')[1]||'').match(/[0-9a-fA-F]{6}/g):v.match(/#?[0-9a-fA-F]{6}\b/g);const hx=(raw||[]).map(h=>'#'+h.replace('#','').toUpperCase());if(hx.length<2){$('imperr').textContent='Paste at least two hex codes';return}const cols=hx.slice(0,12);const src=/^https?:/i.test(v)?srcFromUrl(v):'Pasted';const r=savePalette({name:baseName(cols),colors:cols,src,imported:true,mine:false,source:src,tags:[],url:/^https?:/i.test(v)?v:undefined});renderMain();toast('Added as '+r.name)},
-openphoto:async v=>{const im=await photoImg(v);if(!im){toast('That photo is no longer on this phone');return}openStudio({img:im,photoId:v})},
-theme:v=>{const[k,i]=v.split(':');let t;if(k==='c'||k==='nc')t=THEMES[+i];else{const p=S.saved[+i];if(!p)return;const cols=[...p.colors].sort((a,b)=>hexLch(b)[1]-hexLch(a)[1]).slice(0,4);while(cols.length<4)cols.push(cols[0]);t={name:p.name,cols}}if(k[0]==='n'){S.navTheme=t;S.navPick=false}else S.theme=t;applyTheme();persist();render();toast((k[0]==='n'?'Bar icons: ':'Theme: ')+t.name)},
-navtheme:v=>{if(v==='pick'){S.navPick=true;renderMain();return}S.navPick=false;S.navTheme=v;applyTheme();persist();render()},
-tagdel:v=>{const[c,i]=v.split(':');const arr=c==='d'?S.draft.tags:S.studio.tags;arr.splice(+i,1);if(c==='d')refreshDraft();else renderStudio()},
-tagf:v=>{S.tagF=S.tagF===v?null:v;renderMain()},
+palmode:v=>{S.palMode=v;persist();renderMain()},
+cols:v=>{S.cols=+v;persist();renderMain()},
+rename:v=>{S.renaming=v;S.menu=null;renderMain();const i=$('rn');if(i){i.focus();i.select()}},
+fav:v=>{const p=findP(v);if(!p)return;p.fav=!p.fav;persist();if(S.viewer)renderViewer();if(S.view==='library')renderMain();toast(p.fav?'Added to favorites':'Removed from favorites')},
+/* match to surface */
+match:async v=>{const p=findP(v);if(!p)return;S.menu=null;S.armed=null;if(p.photoId&&await editScanPalette(p,true))return;const[L,C,h]=hexLch(p.colors[0]);S.mo={id:p.id,colors:[...p.colors],start:p.colors.join(),ti:0,m:{tgt:p.colors[0],orig:p.colors[0],L,C,h,big:false}};renderSheet2()},
+mtgt:v=>{startMatch(v)},
+moti:v=>{const mo=S.mo;mo.ti=+v;const hx=mo.colors[mo.ti];const[L,C,h]=hexLch(hx);mo.m={tgt:hx,orig:hx,L,C,h,big:mo.m.big};renderSheet2()},
+mbig:()=>{const m=curMatch();if(!m)return;m.big=!m.big;const el=$('msw');if(el){el.classList.toggle('big',m.big);const b=el.querySelector('.mchev span');if(b)b.style.transform=`rotate(${m.big?180:0}deg)`}},
+mreset:()=>{const m=curMatch();if(!m)return;resetMatch(m);reMatch()},
+muse:()=>{if(S.studio&&S.studio.match){studioUse();return}const mo=S.mo;if(!mo)return;const adj=lchHex(mo.m.L,mo.m.C,mo.m.h);mo.colors[mo.ti]=adj;mo.m.orig=mo.m.tgt=adj;renderSheet2();toast('Color updated')},
+matchback:()=>{S.studio.match=null;renderStudio()},
+moclose:()=>{S.mo=null;renderSheet2()},
+modone:()=>{const mo=S.mo;if(!mo)return;if(mo.colors.join()===mo.start){S.mo=null;renderSheet2();return}const p=findP(mo.id);S.confirm={kind:'mo',orig:p?p.name:'palette',colors:[...mo.colors]};renderSheet2()},
+/* search bar */
+addpaste:()=>{const pp=parsePaste(S.q);if(!pp||!pp.cols){toast('Paste hex codes or a palette link');return}const cols=pp.cols;const r=pp.url?savePalette({name:baseName(cols),colors:cols,src:pp.src,imported:true,mine:false,source:pp.src,tags:[],url:pp.url}):savePalette({name:baseName(cols),colors:cols,src:'Pasted',mine:true,source:null,tags:[]});$('q').blur();go('pal');toast('Added '+r.name)},
+qclear:()=>{clearSearch();$('q').focus()},
+/* library + viewer */
 libf:v=>{S.libF=v;renderMain()},
-editsrc:()=>{S.editSrc=true;renderMain();setTimeout(()=>{const i=$('libsrc');if(i)i.focus()},30)},
+editsrc:()=>{if(S.view!=='library')go('library');S.editSrc=true;renderMain();setTimeout(()=>{const i=$('libsrc');if(i){i.focus();i.select()}},30)},
 cancelsrc:()=>{S.editSrc=false;renderMain()},
-savesrc:()=>{const v=($('libsrc').value||'').trim();renameCreator(v);S.editSrc=false;renderMain()},
-resetdraft:()=>{if(!S.draft||!S.draft.orig)return;Object.assign(S.draft,JSON.parse(S.draft.orig));const el=$('dname');if(el)el.value=S.draft.named?S.draft.name:'';refreshDraft();toast('Back to how it was')},
-streset:()=>{const st=S.studio;if(!st||!st.orig)return;Object.assign(st,JSON.parse(st.orig));const el=$('stn');if(el)el.value=st.name;drawVP();runExtract(0);toast('Back to how it was')},
-stshare:()=>{const c=stFinal();if(!c.length)return;sharePal(stNameInput()||baseName(c),c)},
-exportp:()=>{const data=S.saved.map(({id,name,colors,src,source,mine,tags,created,imported,url})=>({id,name,colors,src,source,mine,tags,created,imported,url}));copy(JSON.stringify({colorshare:1,palettes:data}),'Copied '+data.length+' palettes')},
-importp:()=>{const t=($('impjson').value||'').trim();let d;try{d=JSON.parse(t)}catch(e){toast('That doesn’t look like copied palettes');return}const list=(d&&d.palettes)||[];let n=0;list.forEach(p=>{if(!p||!Array.isArray(p.colors)||S.saved.some(x=>x.id===p.id))return;S.saved.push(norm([p])[0]);n++});persist();renderMain();toast(n?'Imported '+n+' palette'+(n===1?'':'s'):'Nothing new to import')},
-view:v=>{const ids=libList().map(p=>p.id);S.viewer={ids,i:Math.max(0,ids.indexOf(v))};S.menu=null;renderViewer()},
+savesrc:()=>{const i=$('libsrc');if(!i)return;if(renameCreator(i.value)){S.editSrc=false;renderMain()}},
+view:(v,el)=>{const ctx=el&&el.dataset.ctx;const list=ctx==='q'?qList():ctx==='pal'?palOrder():libList();const ids=list.map(p=>p.id);if(!ids.includes(v))ids.unshift(v);const q=$('q');if(q)q.blur();S.viewer={ids,i:ids.indexOf(v)};S.menu=null;renderViewer()},
 vclose:()=>{S.viewer=null;S.menu=null;renderViewer();if(S.view==='library')renderMain()},
 vnext:()=>{const v=S.viewer;if(!v)return;v.i=(v.i+1)%v.ids.length;S.menu=null;renderViewer()},
 vprev:()=>{const v=S.viewer;if(!v)return;v.i=(v.i-1+v.ids.length)%v.ids.length;S.menu=null;renderViewer()},
-vedit:v=>{S.viewer=null;S.menu=null;$('ov').innerHTML='';lockScroll();A.edit(v)},
-reset:()=>{if(!arm('reset')){renderMain();return}['saved','setup','likes','collapsed','acc','groups','theme'].forEach(k=>{LSx.del('cs4_'+k);LSx.del('cs3_'+k)});DB.clear();S.saved=norm(SAMPLE.map(p=>({...p})));S.likeHex=[];S.likes=[];S.setup=true;S.stream=[];S.draft=null;S.collapsed=new Set();S.closedGroups=new Set();S.theme=THEMES[0];applyTheme();persist();go('discover');toast('Prototype data erased')},
+vedit:v=>{S.viewer=null;S.menu=null;$('ov').innerHTML='';lockScroll();clearSearch();A.edit(v)},
+vmatch:v=>{S.viewer=null;S.menu=null;$('ov').innerHTML='';lockScroll();clearSearch();A.match(v)},
+openphoto:async v=>{const im=await photoImg(v);if(!im){toast('That photo is no longer on this phone');return}openStudio({img:im,photoId:v})},
+/* settings */
+theme:v=>{const nav=v[0]==='n';const s=nav?v.slice(1):v;const[k,id]=s.split(':');let t;if(k==='c')t=THEMES[+id];else{const p=findP(id);if(!p)return;t={name:p.name,cols:[...p.colors]}}if(!t)return;if(nav){S.navTheme=t;S.navPick=false}else S.theme=t;applyTheme();persist();render();toast((nav?'Bar icons: ':'Theme: ')+t.name)},
+tgroup:v=>{if(S.themeOpen.has(v))S.themeOpen.delete(v);else S.themeOpen.add(v);renderMain()},
+navtheme:v=>{if(v==='pick'){S.navPick=true;renderMain();return}S.navPick=false;S.navTheme=v;applyTheme();persist();render()},
+tagdel:v=>{const[c,i]=v.split(':');const arr=c==='d'?S.draft.tags:S.studio.tags;arr.splice(+i,1);if(c==='d')refreshDraft();else renderStudio()},
+exportp:()=>{const data=S.saved.map(({id,name,colors,src,source,mine,tags,created,imported,url,fav})=>({id,name,colors,src,source,mine,tags,created,imported,url,fav}));copy(JSON.stringify({colorshare:1,creator:S.creator,palettes:data}),'Copied '+data.length+' palettes')},
+importp:()=>{const t=($('impjson').value||'').trim();let d;try{d=JSON.parse(t)}catch(e){toast('That doesn’t look like copied palettes');return}const list=(d&&d.palettes)||[];let n=0;list.forEach(p=>{if(!p||!Array.isArray(p.colors)||S.saved.some(x=>x.id===p.id))return;S.saved.push(norm([p])[0]);n++});persist();renderMain();toast(n?'Imported '+n+' palette'+(n===1?'':'s'):'Nothing new to import')},
+reset:()=>{if(!arm('reset')){renderMain();return}['saved','setup','likes','collapsed','acc','groups','theme','navTheme','creator','names','openph','hues','sort','palMode','cols','zoom','variety'].forEach(k=>{LSx.del('cs4_'+k);LSx.del('cs3_'+k)});DB.clear();S.saved=norm(SAMPLE.map(p=>({...p})));S.likeHex=[];S.likes=[];S.setupOpen=false;S.hues.clear();S.sort='random';S.draft=null;S.openPh=new Set();S.closedGroups=new Set();S.theme=THEMES[0];S.navTheme='match';S.creator='A-Frame';S.names=[];S.stream=streamBatch(60);applyTheme();persist();go('discover');toast('Prototype data erased')},
+/* studio */
 stclose:()=>closeStudio(),
 stauto:()=>{const el=$('stn');if(el){el.value=baseName(stFinal());S.studio.name=el.value}},
-stsave:()=>{const st=S.studio;stNameInput();if(st.editId){const p=S.saved.find(x=>x.id===st.editId);S.confirm={kind:'studio',orig:p?p.name:'palette',colors:stFinal()};renderSheet2()}else saveStudio(false)},
-sttoggle:v=>{const st=S.studio;const L=stLists();if(L.incSet.has(v))st.off.push(v);else{if(L.inc.length>=12){toast('This palette is full at 12 colors');return}st.off=st.off.filter(h=>h!==v)}renderStudio()},
-unpick:()=>{const st=S.studio;st.added.pop();drawVP();renderStudio()},
-matchopen:()=>{const st=S.studio;const a=st.added[st.added.length-1];if(!a)return;stNameInput();const[L,C,h]=hexLch(a.hex);st.match={orig:a.hex,L,C,h};renderStudio()},
-matchback:()=>{S.studio.match=null;renderStudio()},
-matchreset:()=>{const m=S.studio.match;const[L,C,h]=hexLch(m.orig);Object.assign(m,{L,C,h});renderStudio()},
-matchuse:()=>{const st=S.studio,m=st.match;const a=st.added[st.added.length-1];if(a)a.hex=lchHex(m.L,m.C,m.h);st.match=null;drawVP();renderStudio()}
+stsave:()=>{const st=S.studio;stNameInput();if(st.editId){const p=findP(st.editId);S.confirm={kind:'studio',orig:p?p.name:'palette',colors:stFinal()};renderSheet2()}else saveStudio(false)},
+sttoggle:v=>{const st=S.studio;const L=stLists();if(L.incSet.has(v))st.off.push(v);else{if(L.inc.length>=12){toast('This palette is full at 12 colors');return}st.off=st.off.filter(h=>h!==v)}renderStChips()},
+unpick:()=>{const st=S.studio;st.added.pop();drawVP();renderStChips()},
+streset:()=>{const st=S.studio;if(!st||!st.orig)return;Object.assign(st,JSON.parse(st.orig));st.match=null;drawVP();st.auto=extractRegion(st.k);renderStudio();toast('Back to how it was')},
+stshare:()=>{const c=stFinal();if(!c.length)return;sharePal(stNameInput()||baseName(c),c)}
 };
-document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(!t)return;if(t.classList.contains('sheet-bg')&&e.target!==t)return;const f=A[t.dataset.a];if(f)f(t.dataset.v,t)});
-function snapCheck(el){let v=+el.value;const w=el.parentElement;if(Math.abs(v)<=7&&v!==0){v=0;el.value=0}const was=w.classList.contains('zero');w.classList.toggle('zero',v===0);if(v===0&&!was){w.classList.remove('pop');void w.offsetWidth;w.classList.add('pop');if(navigator.vibrate)try{navigator.vibrate(6)}catch(_){}}return v}
-document.addEventListener('input',e=>{const el=e.target,id=el.id;const v=el.dataset.snap?snapCheck(el):+el.value;
-if(id==='zoom'){S.zoom=12-v;const g=$('sgrid');if(g)g.style.gridTemplateColumns=`repeat(${S.zoom},minmax(0,1fr))`}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(!t)return;if(t.classList.contains('sheet-bg')&&e.target!==t)return;if(Date.now()-padEnded<350&&e.target.closest('.pad'))return;const f=A[t.dataset.a];if(f)f(t.dataset.v,t)});
+let padEnded=0;
+function commitRename(el){const id=el.dataset.id;if(S.renaming!==id)return;S.renaming=null;const p=findP(id);const v=el.value.trim();if(p&&v&&v!==p.name){p.name=uniqueName(v,id);persist();toast('Renamed '+p.name)}setTimeout(renderMain,0)}
+document.addEventListener('focusout',e=>{if(e.target.id==='rn')commitRename(e.target)});
+document.addEventListener('focusin',e=>{if(e.target.id==='q'&&S.q.trim())renderResults();if(e.target.id==='pastebox'){const r=document.createRange();r.selectNodeContents(e.target);const s=getSelection();s.removeAllRanges();s.addRange(r)}});
+document.addEventListener('input',e=>{const el=e.target,id=el.id;
+if(id==='q'){S.q=el.value;renderResults()}
 else if(id==='dname'&&S.draft){S.draft.name=el.value;S.draft.named=el.value.trim().length>0}
-else if(id==='tl'&&S.draft){S.draft.light=v/100;repaintStrip()}
-else if(id==='tb'&&S.draft){S.draft.bold=v/100;repaintStrip()}
-else if(id==='imp'){const er=$('imperr');if(er)er.textContent=''}
-else if(id==='q'){S.q=el.value;const t=document.createElement('div');t.innerHTML=palHTML();const pl=$('plist');if(pl){pl.innerHTML=t.querySelector('#plist').innerHTML;hydrateThumbs()}}
-else if(id==='dsrc'&&S.draft){S.draft.source=el.value.trim()||null}
-else if(id==='ssrc'&&S.studio){S.studio.source=el.value.trim()||null}
-else if(id==='stn'&&S.studio){S.studio.name=el.value}
-else if(id==='stl'&&S.studio){S.studio.light=v/100;repaintStudioTones()}
-else if(id==='stb'&&S.studio){S.studio.bold=v/100;repaintStudioTones()}
-else if(id==='stk'&&S.studio){S.studio.k=v;const lab=el.parentElement.nextElementSibling;if(lab)lab.textContent=v;runExtract(120)}});
-document.addEventListener('change',e=>{const id=e.target.id,v=+e.target.value;if(id==='creator'){renameCreator(e.target.value.trim());return}if(id==='dtag'||id==='stag'){const t=e.target.value.trim();if(t){const arr=id==='dtag'?S.draft.tags:S.studio.tags;if(!arr.includes(t))arr.push(t);if(id==='dtag')refreshDraft();else renderStudio()}return}if(id==='variety'){S.variety=v;S.stream=streamBatch(60);renderMain()}if(id==='far'){S.far=v;buildSugg();renderMain()}});
+else if(id==='stn'&&S.studio){S.studio.name=el.value}});
+function addTag(id,t){t=(t||'').trim();if(!t)return;const arr=id==='dtag'?S.draft.tags:S.studio.tags;if(!arr.includes(t))arr.push(t);if(id==='dtag')refreshDraft();else renderStudio();fillTaglist();setTimeout(()=>{const i=$(id);if(i)i.focus()},0)}
+document.addEventListener('change',e=>{const id=e.target.id;if(id==='creator'){renameCreator(e.target.value);return}if(id==='dtag'||id==='stag'){addTag(id,e.target.value)}});
 ['file','cam'].forEach(id=>$(id).addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)openFile(f)}));
 document.addEventListener('paste',e=>{const items=e.clipboardData&&e.clipboardData.items;let found=false;if(items)for(const it of items){if(it.type&&it.type.indexOf('image/')===0){const f=it.getAsFile();if(f){found=true;e.preventDefault();openFile(f);break}}}if(!found&&e.target&&e.target.id==='pastebox'){e.preventDefault();toast('No image on the clipboard. Copy a screenshot first.')}});
-document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.target.id==='dtag'||e.target.id==='stag'||e.target.id==='imp'||e.target.id==='libsrc')){e.preventDefault();if(e.target.id==='imp')A.import();else if(e.target.id==='libsrc')A.savesrc();else e.target.blur()}});
+document.addEventListener('keydown',e=>{const id=e.target.id;
+if(e.key==='Escape'&&id==='rn'){S.renaming=null;renderMain();return}
+if(e.key!=='Enter')return;
+if(id==='q'){e.preventDefault();const pp=parsePaste(S.q);if(pp&&pp.cols)A.addpaste();else e.target.blur();return}
+if(id==='libsrc'){e.preventDefault();A.savesrc();return}
+if(['dtag','stag','rn','creator'].includes(id)){e.preventDefault();e.target.blur()}});
 document.addEventListener('beforeinput',e=>{if(e.target&&e.target.id==='pastebox'&&e.inputType!=='insertFromPaste')e.preventDefault()});
-document.addEventListener('focusin',e=>{if(e.target.id==='pastebox'){const r=document.createRange();r.selectNodeContents(e.target);const s=getSelection();s.removeAllRanges();s.addRange(r)}});
 window.addEventListener('resize',()=>{if(S.studio)drawVP()});
 
-/* strip: hold to drag-reorder, tap to remove */
+/* touch: slide bars, and the palette strip (hold to drag-reorder, tap to select) */
 let drag=null;
 function paintDrag(){const st=$('strip');if(!st||!drag)return;const cols=tone(drag.tmp,S.draft.light,S.draft.bold);[...st.children].forEach((c,i)=>{c.style.background=cols[i];c.style.transform=i===drag.cur?'scale(1.12)':'';c.style.outline=i===drag.cur?'2px solid #fff':''})}
 function dStart(x,y,el){const ch=el.closest&&el.closest('[data-chip]');if(!ch||!S.draft)return false;const i=+ch.dataset.chip;drag={i,x,y,live:false,tmp:[...S.draft.base],cur:i,timer:setTimeout(()=>{if(drag){drag.live=true;paintDrag();if(navigator.vibrate)try{navigator.vibrate(8)}catch(_){}}},320)};return true}
 function dMove(x,y){if(!drag)return false;if(!drag.live){if(Math.hypot(x-drag.x,y-drag.y)>10){clearTimeout(drag.timer);drag=null}return false}const st=$('strip');if(!st)return true;const r=st.getBoundingClientRect();const n=drag.tmp.length;const t=clamp(Math.floor((x-r.left)/r.width*n),0,n-1);if(t!==drag.cur){const[c]=drag.tmp.splice(drag.cur,1);drag.tmp.splice(t,0,c);drag.cur=t;paintDrag()}return true}
-function dEnd(cancel){if(!drag)return;clearTimeout(drag.timer);const d=drag;drag=null;if(!S.draft)return;if(d.live){S.draft.base=d.tmp;refreshDraft()}else if(!cancel){S.draft.base.splice(d.i,1);refreshDraft()}}
-document.addEventListener('touchstart',e=>{if(e.touches.length===1)dStart(e.touches[0].clientX,e.touches[0].clientY,e.target)},{passive:true});
-document.addEventListener('touchmove',e=>{if(drag&&dMove(e.touches[0].clientX,e.touches[0].clientY))e.preventDefault()},{passive:false});
-document.addEventListener('touchend',e=>{if(drag){e.preventDefault();dEnd(false)}},{passive:false});
-document.addEventListener('touchcancel',()=>dEnd(true));
-document.addEventListener('mousedown',e=>{if(dStart(e.clientX,e.clientY,e.target)){const mm=ev=>dMove(ev.clientX,ev.clientY);const mu=()=>{dEnd(false);window.removeEventListener('mousemove',mm);window.removeEventListener('mouseup',mu)};window.addEventListener('mousemove',mm);window.addEventListener('mouseup',mu)}});
-document.addEventListener('contextmenu',e=>{if(e.target.closest('#strip'))e.preventDefault()});
+function dEnd(cancel){if(!drag)return;clearTimeout(drag.timer);const d=drag;drag=null;if(!S.draft)return;if(d.live){const was=S.draft.sel!=null?S.draft.base[S.draft.sel]:null;S.draft.base=d.tmp;S.draft.sel=was?d.tmp.indexOf(was):null;if(S.draft.sel<0)S.draft.sel=null;refreshDraft()}else if(!cancel){S.draft.sel=S.draft.sel===d.i?null:d.i;refreshDraft()}}
+document.addEventListener('touchstart',e=>{lastTouch=Date.now();if(e.touches.length!==1)return;const t=e.touches[0];if(padDown(t.clientX,e.target))return;dStart(t.clientX,t.clientY,e.target)},{passive:true});
+document.addEventListener('touchmove',e=>{if(PD){e.preventDefault();padMove(e.touches[0].clientX);return}if(drag&&dMove(e.touches[0].clientX,e.touches[0].clientY))e.preventDefault()},{passive:false});
+document.addEventListener('touchend',e=>{lastTouch=Date.now();if(PD){padUp();padEnded=Date.now();return}if(drag){e.preventDefault();dEnd(false)}},{passive:false});
+document.addEventListener('touchcancel',()=>{padUp();dEnd(true)});
+document.addEventListener('mousedown',e=>{if(Date.now()-lastTouch<800)return;if(padDown(e.clientX,e.target)){const mm=ev=>padMove(ev.clientX);const mu=()=>{padUp();padEnded=Date.now();window.removeEventListener('mousemove',mm);window.removeEventListener('mouseup',mu)};window.addEventListener('mousemove',mm);window.addEventListener('mouseup',mu);return}
+if(dStart(e.clientX,e.clientY,e.target)){const mm=ev=>dMove(ev.clientX,ev.clientY);const mu=()=>{dEnd(false);window.removeEventListener('mousemove',mm);window.removeEventListener('mouseup',mu)};window.addEventListener('mousemove',mm);window.addEventListener('mouseup',mu)}});
+document.addEventListener('contextmenu',e=>{if(e.target.closest('#strip')||e.target.closest('.pad'))e.preventDefault()});
+
+/* keep the search bar above the iPhone keyboard */
+if(window.visualViewport){const vv=window.visualViewport;const fit=()=>{const kb=Math.max(0,window.innerHeight-vv.height-vv.offsetTop);const on=kb>80;document.body.classList.toggle('kb',on);document.documentElement.style.setProperty('--kb',(on?kb:0)+'px')};vv.addEventListener('resize',fit);vv.addEventListener('scroll',fit)}
+/* Inside the Claude app the page sits in a frame that can shrink to its content,
+   which left a black band under the bottom bar on short pages. Fill the screen. */
+try{if(window.self!==window.top&&screen.height)document.documentElement.style.setProperty('--minh',screen.height+'px')}catch(e){}
 
 /* boot */
-S.pool=[...setupBatch(),...setupBatch()];if(!S.setup)S.stream=streamBatch(60);persist();render();
+applyTheme();
+S.pool=[...setupBatch(),...setupBatch()];S.stream=streamBatch(60);persist();render();
 DB.open().then(()=>DB.all()).then(list=>{list.forEach(p=>MEM.set(p.id,p));if(['pal','library','settings'].includes(S.view))renderMain()});
 
 /* Clean up the old Swatch Studio service worker on phones that installed it. */
