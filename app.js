@@ -99,6 +99,27 @@ let tT;function toast(m,ms){const t=$('toast');t.textContent=m;t.classList.add('
 function fallback(t,cb){const a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.position='absolute';a.style.left='-9999px';document.body.appendChild(a);a.select();a.setSelectionRange(0,t.length);let ok=false;try{ok=document.execCommand('copy')}catch(e){}a.remove();cb(ok)}
 function copy(t,msg){const d=ok=>toast(ok===false?'Copy blocked here':(msg||(t.length<=7?'Copied '+t:'Copied')));try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(()=>d(true),()=>fallback(t,d));return}}catch(e){}fallback(t,d)}
 const cssOf=(name,c)=>`/* ${name} · ColorShare */\n:root {\n${c.map((h,i)=>`  --color-${i+1}: ${h};`).join('\n')}\n}`;
+/* ---------- share card: the palette drawn as one image (photo, swatches, codes, name) ---------- */
+function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
+function fitText(c,t,max){if(c.measureText(t).width<=max)return t;while(t.length>1&&c.measureText(t+'…').width>max)t=t.slice(0,-1);return t+'…'}
+async function makeCard(o){try{await document.fonts.load('700 64px "Bricolage Grotesque"')}catch(e){}
+const W=1080,P=60,IN=W-2*P,n=o.colors.length,ph=!!o.img,barH=ph?200:380,hexSz=Math.round(Math.min(28,IN/n/4.3));
+const H=P+(ph?IN+36:0)+barH+18+hexSz+44+70+20+34+56+34+P;
+const cv=document.createElement('canvas');cv.width=W;cv.height=H;const c=cv.getContext('2d');c.fillStyle='#0E0E12';c.fillRect(0,0,W,H);let y=P;
+if(ph){c.save();rr(c,P,y,IN,IN,36);c.clip();c.drawImage(o.img,o.crop.x,o.crop.y,o.crop.side,o.crop.side,P,y,IN,IN);c.restore();y+=IN+36}
+c.save();rr(c,P,y,IN,barH,32);c.clip();const sw=IN/n;o.colors.forEach((h,i)=>{c.fillStyle=h;c.fillRect(P+i*sw-0.5,y,sw+1,barH)});c.restore();y+=barH+18;
+c.textBaseline='top';c.textAlign='center';c.fillStyle='#A9A9B6';c.font=`600 ${hexSz}px ui-monospace, SFMono-Regular, Menlo, monospace`;o.colors.forEach((h,i)=>c.fillText(h.slice(1),P+sw*(i+.5),y));y+=hexSz+44;
+c.textAlign='left';c.fillStyle='#F3F3F6';c.font='700 64px "Bricolage Grotesque", -apple-system, system-ui, sans-serif';c.fillText(fitText(c,o.name,IN),P,y);y+=70+20;
+c.font='700 30px -apple-system, system-ui, sans-serif';c.fillStyle='#D8D8E0';c.fillText(fitText(c,o.src,IN),P,y);y+=34+56;
+[['#471396',0,0],['#8CABFF',1,0],['#78B9B5',0,1],['#FFCC00',1,1]].forEach(([col,a,b])=>{c.fillStyle=col;rr(c,P+a*17,y+b*17,15,15,4);c.fill()});
+c.fillStyle='#8A8A96';c.font='600 26px -apple-system, system-ui, sans-serif';c.fillText('Made with ColorShare',P+46,y+2);
+return new Promise(res=>cv.toBlob(b=>res(b),'image/png'))}
+const shareText=(name,cols)=>`${name}\n${cols.join(' ')}\nMade with ColorShare`;
+async function openShare(o){toast('Making your card…',1200);const blob=await makeCard(o);if(!blob){sharePal(o.name,o.colors);return}
+const file=new File([blob],(o.name||'palette').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-')+'.png',{type:'image/png'});if(S.shareCard)URL.revokeObjectURL(S.shareCard.url);
+S.shareCard={file,url:URL.createObjectURL(blob),text:shareText(o.name,o.colors),name:o.name};renderSheet2();$('toast').classList.remove('show')}
+async function shareSaved(p){let img=null,crop=null;if(p.photoId&&MEM.has(p.photoId)){const im=await photoImg(p.photoId);if(im){const sc=p.scan||{z:1,cx:.5,cy:.5};const iw=im.naturalWidth,ih=im.naturalHeight;const side=Math.min(iw,ih)/(sc.z||1);crop={side,x:clamp(sc.cx*iw,side/2,iw-side/2)-side/2,y:clamp(sc.cy*ih,side/2,ih-side/2)-side/2};img=im}}
+openShare({name:p.name,colors:p.colors,src:srcLine(p),img,crop})}
 function sharePal(name,cols){const text=`${name}\n${cols.join('  ')}\nMade with ColorShare`;const fb=()=>copy(text,'Copied, ready to paste and share');try{if(navigator.share){navigator.share({title:name,text}).catch(e=>{if(!e||e.name!=='AbortError')fb()});return}}catch(e){}fb()}
 function arm(key){if(S.armed===key){S.armed=null;return true}S.armed=key;setTimeout(()=>{if(S.armed===key){S.armed=null;if(S.view==='pal'||S.view==='settings')renderMain()}},3000);return false}
 
@@ -349,10 +370,11 @@ function moHTML(){const mo=S.mo;return`<div class="sheet-bg"><div class="sheet">
 function renderSheet2(){const o=$('ov2');
 if(S.chooser){o.innerHTML=`<div class="sheet-bg" data-a="chooseclose"><div class="sheet"><div class="handle"></div><div class="h2" style="font-size:20px;margin-bottom:14px">Scan colors</div><button class="choice" data-a="takephoto">${ICON.camera}<span><span class="h2" style="display:block">Take photo</span><span class="lbl">Opens your camera</span></span></button><button class="choice" data-a="chooselib">${ICON.library}<span><span class="h2" style="display:block">Photo library</span><span class="lbl">Photos and screenshots you already have</span></span></button><button class="btn big ghost" style="width:100%" data-a="chooseclose">Cancel</button></div></div>`;lockScroll();return}
 if(S.confirm){const c=S.confirm;o.innerHTML=`<div class="sheet-bg" data-a="cconfirm"><div class="sheet"><div class="handle"></div><div class="h2" style="font-size:20px">Save changes to ${esc(c.orig)}?</div><div class="lbl" style="margin:4px 0 14px">Overwrite replaces the original. Save as new keeps both.</div><div class="pal" style="height:46px;margin-bottom:18px">${c.colors.map(h=>`<div style="background:${h};cursor:default"></div>`).join('')}</div><button class="btn big pri" style="width:100%;margin-bottom:10px" data-a="overwrite">Overwrite</button><button class="btn big" style="width:100%;margin-bottom:6px" data-a="saveasnew">Save as new</button><button class="btn big ghost" style="width:100%" data-a="cconfirm">Cancel</button></div></div>`;lockScroll();return}
+if(S.shareCard){const sc=S.shareCard;o.innerHTML=`<div class="sheet-bg" data-a="shareclose" style="z-index:60"><div class="sheet"><div class="handle"></div><div class="row" style="margin-bottom:10px"><span class="h2 sp" style="font-size:20px">Share ${esc(sc.name)}</span><button class="btn sm ghost icon" data-a="shareclose" aria-label="Close">${ICON.close}</button></div><img class="sharecard" src="${sc.url}" alt="${esc(sc.name)} palette card"><div class="lbl" style="margin:8px 0 12px;text-align:center">The hex codes go along as text, so they can be copied.</div><button class="btn big pri" style="width:100%;margin-bottom:8px" data-a="sharego">${ICON.share}Share card</button><button class="btn big" style="width:100%" data-a="sharecodes">${ICON.copy}Copy hex codes</button></div></div>`;lockScroll();return}
 if(S.namer){const nm=S.namer;o.innerHTML=`<div class="sheet-bg" data-a="namecancel"><div class="sheet"><div class="handle"></div><div class="h2" style="font-size:20px;margin-bottom:12px">Name your palette</div><div class="pal" style="height:46px;margin-bottom:14px">${nm.colors.map(h=>`<div style="background:${h};cursor:default"></div>`).join('')}</div><div class="row"><input type="text" class="name" id="nmin" value="${esc(nm.name)}" aria-label="Palette name" autocomplete="off" enterkeyhint="done"><button class="btn sm" data-a="namealt">Suggest</button></div><div class="lbl" style="margin:6px 0 16px">Keep this name, type your own, or tap Suggest for another.</div><div class="row"><button class="btn big ghost" data-a="namecancel">Back</button><button class="btn big pri" style="flex:1" data-a="namesave">Save palette</button></div></div></div>`;lockScroll();return}
 if(S.mo){o.innerHTML=moHTML();lockScroll();return}
 o.innerHTML='';lockScroll()}
-function lockScroll(){document.body.style.overflow=(S.studio||S.confirm||S.chooser||S.viewer||S.mo||S.namer)?'hidden':''}
+function lockScroll(){document.body.style.overflow=(S.studio||S.confirm||S.chooser||S.viewer||S.mo||S.namer||S.shareCard)?'hidden':''}
 function savePalette(rec,overwriteId){if(overwriteId){const i=S.saved.findIndex(p=>p.id===overwriteId);rec.name=uniqueName(rec.name,overwriteId);rec.id=overwriteId;rec.created=S.saved[i].created;if(rec.fav===undefined)rec.fav=S.saved[i].fav;S.saved[i]=rec}else{rec.name=uniqueName(rec.name);rec.id=uid();rec.created=Date.now();S.saved.unshift(rec)}if(!persist())toast('Storage is full. Delete a few palettes or photos.',3500);return rec}
 function openFile(f){const url=URL.createObjectURL(f);const im=new Image();im.onload=()=>{openStudio({img:im});URL.revokeObjectURL(url)};im.onerror=()=>{toast('That image could not be opened. Try a JPEG or PNG.');URL.revokeObjectURL(url)};im.src=url}
 function region(){const st=S.studio;const side=Math.min(st.iw,st.ih)/st.z;const cx=clamp(st.cx*st.iw,side/2,st.iw-side/2),cy=clamp(st.cy*st.ih,side/2,st.ih-side/2);st.cx=cx/st.iw;st.cy=cy/st.ih;return{side,x:cx-side/2,y:cy-side/2}}
@@ -462,7 +484,7 @@ pick:v=>addToDraft(v),
 autoname:()=>{const el=$('dname');if(el){el.value=autoName();S.draft.name=el.value;S.draft.named=true}},
 build:()=>{const c=draftCols();if(!c.length){toast('Add at least one color first');return}keepDraftName();S.anchors=c;buildSugg();go('build')},
 adddisc:()=>{keepDraftName();S.setupOpen=false;if(!S.stream.length)S.stream=streamBatch(60);go('discover');toast('Tap colors to add them')},
-sharedraft:()=>{const c=draftCols();if(!c.length){toast('Add a color first');return}sharePal(draftName(),c)},
+sharedraft:()=>{const c=draftCols();if(!c.length){toast('Add a color first');return}openShare({name:draftName(),colors:c,src:S.draft.mine!==false?`${S.creator.toUpperCase()} · Custom`:(S.draft.source||'')})},
 clearall:()=>{if(!S.draft.base.length)return;if(!arm('clear')){refreshDraft();return}S.draft.base=[];S.draft.sel=null;S.draft.light=S.draft.bold=0;refreshDraft()},
 chipdel:()=>{const d=S.draft;if(!d||d.sel==null)return;d.base.splice(d.sel,1);d.sel=null;refreshDraft()},
 chipdone:()=>{if(S.draft){S.draft.sel=null;refreshDraft()}},
@@ -493,7 +515,7 @@ menu:v=>{S.menu=S.menu===v?null:v;if(S.viewer)renderViewer();else renderMain()},
 copyhex:v=>{const p=findP(v);if(p)copy(p.colors.join(', '),'Copied hex codes');S.menu=null;S.viewer?renderViewer():renderMain()},
 copycss:v=>{const p=findP(v);if(p)copy(cssOf(p.name,p.colors),'Copied website code');S.menu=null;S.viewer?renderViewer():renderMain()},
 paintsoon:()=>toast('Paint matching is coming next'),
-share:v=>{const p=findP(v);if(p)sharePal(p.name,p.colors)},
+share:v=>{const p=findP(v);if(p)shareSaved(p)},
 edit:v=>{const p=findP(v);if(!p)return;S.armed=null;if(p.photoId)editScanPalette(p);else startEditDraft(p)},
 del:v=>{if(!arm('del'+v)){renderMain();return}const p=findP(v);S.saved=S.saved.filter(x=>x.id!==v);if(S.draft&&S.draft.id===v)S.draft=null;persist();renderMain();toast('Deleted '+(p?p.name:''))},
 togglephoto:v=>{if(S.openPh.has(v))S.openPh.delete(v);else S.openPh.add(v);persist();renderMain()},
@@ -542,7 +564,10 @@ stsave:()=>{const st=S.studio;stNameInput();if(st.editId){const p=findP(st.editI
 sttoggle:v=>{const st=S.studio;const L=stLists();if(L.incSet.has(v))st.off.push(v);else{if(L.inc.length>=12){toast('This palette is full at 12 colors');return}st.off=st.off.filter(h=>h!==v)}renderStChips()},
 unpick:()=>{const st=S.studio;st.added.pop();drawVP();renderStChips()},
 streset:()=>{const st=S.studio;if(!st||!st.orig)return;Object.assign(st,JSON.parse(st.orig));st.match=null;drawVP();st.auto=extractRegion(st.k);renderStudio();toast('Back to how it was')},
-stshare:()=>{const c=stFinal();if(!c.length)return;sharePal(stNameInput()||baseName(c),c)}
+stshare:()=>{const st=S.studio;const c=stFinal();if(!c.length)return;const r=region();openShare({name:stNameInput()||baseName(c),colors:c,src:`${S.creator.toUpperCase()} · Scanned`,img:st.src,crop:{x:r.x,y:r.y,side:r.side}})},
+sharego:()=>{const sc=S.shareCard;if(!sc)return;const data={files:[sc.file],text:sc.text,title:sc.name};try{if(navigator.canShare&&navigator.canShare({files:[sc.file]})){navigator.share(data).catch(e=>{if(!e||e.name!=='AbortError')toast('Press and hold the card to save or share it',3000)});return}}catch(e){}toast('Press and hold the card to save or share it',3000)},
+sharecodes:()=>{const sc=S.shareCard;if(sc)copy(sc.text.split('\n')[1],'Copied the hex codes')},
+shareclose:()=>{if(S.shareCard)URL.revokeObjectURL(S.shareCard.url);S.shareCard=null;renderSheet2()}
 };
 document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(!t)return;if(t.classList.contains('sheet-bg')&&e.target!==t)return;if(Date.now()-padEnded<350&&e.target.closest('.pad'))return;const f=A[t.dataset.a];if(f)f(t.dataset.v,t)});
 let padEnded=0;
