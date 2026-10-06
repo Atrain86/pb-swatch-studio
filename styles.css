@@ -57,13 +57,13 @@ main{max-width:520px;margin:0 auto;padding:calc(var(--hh) + 14px) 16px calc(var(
 .btn.big{height:50px;border-radius:14px;font-size:16px;padding:0 18px}
 .btn.pri{background:var(--prifill,var(--acc));color:var(--priink,var(--ink));border:1.5px solid var(--acc);font-family:var(--disp);font-weight:700}
 .btn.ghost{background:none;border-color:transparent;color:var(--fg2)}
-.btn.out{background:none;border-color:var(--acc);color:var(--acc);font-weight:600}
+.btn.out{background:none;border-color:var(--acc);color:var(--fg);font-weight:600}
 .btn.warn{color:var(--danger);border-color:rgba(255,138,128,.45)}
 .btn.icon{width:40px;padding:0}
 .btn.sm.icon{width:34px}
 .btn:active{transform:scale(.97)}
 .btn svg{width:17px;height:17px;flex-shrink:0}
-.badge{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--ink);color:var(--acc);font-size:12px;font-weight:700;font-family:var(--ui)}
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--ink);color:#fff;font-size:12px;font-weight:700;font-family:var(--ui)}
 .card{background:var(--s1);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px}
 .card.ed{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
 .sw{aspect-ratio:1;max-width:100%;width:100%;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer}
@@ -199,7 +199,7 @@ body.kb .results{bottom:calc(var(--sh) + var(--kb) + var(--db))}
 .ddpanel{margin-top:8px;padding:10px;border-radius:14px;background:var(--s2);border:1px solid var(--line2)}
 .seg button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .seg button svg{width:15px;height:15px}
-.theme .dots8{display:flex;gap:3px;flex-shrink:0}.theme .dots8 i{width:14px;height:14px;border-radius:4px;display:block}
+.theme .dots8{display:flex;gap:4px;flex-shrink:0}.theme .dots8 i{width:20px;height:20px;border-radius:6px;display:block}
 .teach{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--s2);border:1px solid var(--line2);font-size:14px}
 .teach .tbox{width:24px;height:24px;border-radius:7px;border:2px solid var(--line2);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--ink)}
 .teach.on .tbox{background:var(--acc);border-color:var(--acc)}
@@ -209,5 +209,8 @@ body.kb .results{bottom:calc(var(--sh) + var(--kb) + var(--db))}
 .img.tp img{flex:1 1 0;min-height:0;height:0;width:100%;object-fit:cover}
 .img.tp .tsw{flex:0 0 24%;display:flex}
 .img.tp .tsw div{flex:1}
+.nmwrap{position:relative;flex:1;min-width:0}
+.nmwrap input{padding-right:84px}
+.nmsug{position:absolute;right:4px;top:50%;transform:translateY(-50%);height:30px;padding:0 10px;border-radius:9px;font-size:13px;color:var(--fg2);background:var(--s3)}
 @media (prefers-reduced-motion: reduce){.chip,.toast,.vphint{transition:none}}
 input[type=search]::-webkit-search-cancel-button,input[type=search]::-webkit-search-decoration{-webkit-appearance:none;display:none}
