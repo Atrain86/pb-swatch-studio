@@ -152,10 +152,10 @@ input.name{height:38px;font-weight:600}
 .heart.on{color:var(--fav)}
 .fs{position:fixed;inset:0;z-index:45;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 .fs-top{height:54px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--edge);flex-shrink:0}
-.fs-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px 20px;max-width:560px;width:100%;margin:0 auto}
+.fs-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 16px 12px;max-width:560px;width:100%;margin:0 auto}
 .fs-ph{border-radius:18px;overflow:hidden;background:#000;margin-bottom:14px;cursor:pointer}
-.fs-ph canvas{display:block;width:100%;aspect-ratio:1}
-.fs-bot{display:flex;gap:10px;padding:10px 16px;border-top:1px solid var(--line);flex-shrink:0;max-width:560px;width:100%;margin:0 auto}
+.fs-ph canvas{display:block;width:100%;height:min(calc(100vw - 32px),524px,calc(100vh - 54px - 64px - 262px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)));min-height:150px}
+.fs-bot{display:flex;gap:10px;padding:8px 16px;border-top:1px solid var(--line);flex-shrink:0;max-width:560px;width:100%;margin:0 auto}
 .seg{display:flex;background:var(--s2);border:1px solid var(--line2);border-radius:12px;padding:3px;gap:3px}
 .seg button{flex:1;height:32px;border-radius:9px;font-size:13px;color:var(--fg2);padding:0 10px}
 .seg button.on{background:var(--s3);color:var(--fg);font-weight:600}
