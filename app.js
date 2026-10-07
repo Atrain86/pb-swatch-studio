@@ -469,13 +469,17 @@ if(g.mode==='loupe'){hideLoupe();if(!cancelled&&st.match){const[L,C,h]=hexLch(g.
 if(g.mode==='pinch'){if(remaining.length===1){g={mode:'idle'}}else{g=null;runExtract(0)}return}
 if(g.mode==='pend'&&!cancelled&&!st.hinted){st.hinted=true;toast('Press and hold to pick a color')}
 if(g.mode==='pan')runExtract(0);if(!remaining.length)g=null}
-const tp=e=>[...e.touches].map(t=>rel(t.clientX,t.clientY));
-vp.addEventListener('touchstart',e=>{e.preventDefault();const p=tp(e);if(g&&g.mode==='idle'&&p.length===1)return;down(p)},{passive:false});
-vp.addEventListener('touchmove',e=>{e.preventDefault();if(g&&g.mode==='idle')return;move(tp(e))},{passive:false});
-vp.addEventListener('touchend',e=>{e.preventDefault();const r=tp(e);if(g&&g.mode==='idle'){if(!r.length){g=null;runExtract(0)}return}up(r,false)},{passive:false});
-vp.addEventListener('touchcancel',e=>{up(tp(e),true)});
+/* Pointer events: the browser gives each finger's position relative to the photo itself
+   (offsetX/Y), the same point it uses to decide what you touched, so the magnifier sits
+   exactly under your finger even inside the Claude app on iPhone. */
+const PT=new Map();const pts=()=>[...PT.values()];
+const posOf=e=>{if(typeof e.offsetX==='number'&&(e.target===vp||e.target===vp.querySelector('canvas')))return[e.offsetX,e.offsetY];return rel(e.clientX,e.clientY)};
+vp.addEventListener('pointerdown',e=>{e.preventDefault();try{vp.setPointerCapture(e.pointerId)}catch(_){}PT.set(e.pointerId,posOf(e));const p=pts();if(g&&g.mode==='idle'&&p.length===1)return;down(p)});
+vp.addEventListener('pointermove',e=>{if(!PT.has(e.pointerId))return;e.preventDefault();PT.set(e.pointerId,posOf(e));if(g&&g.mode==='idle')return;move(pts())});
+const pend=(e,cancel)=>{if(!PT.has(e.pointerId))return;PT.delete(e.pointerId);try{vp.releasePointerCapture(e.pointerId)}catch(_){}const r=pts();if(g&&g.mode==='idle'){if(!r.length){g=null;runExtract(0)}return}up(r,cancel)};
+vp.addEventListener('pointerup',e=>pend(e,false));vp.addEventListener('pointercancel',e=>pend(e,true));
+vp.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});vp.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
 vp.addEventListener('gesturestart',e=>e.preventDefault());vp.addEventListener('contextmenu',e=>e.preventDefault());
-vp.addEventListener('mousedown',e=>{const p=[rel(e.clientX,e.clientY)];down(p);const mm=ev=>move([rel(ev.clientX,ev.clientY)]);const mu=()=>{up([],false);window.removeEventListener('mousemove',mm);window.removeEventListener('mouseup',mu)};window.addEventListener('mousemove',mm);window.addEventListener('mouseup',mu)});
 vp.addEventListener('wheel',e=>{e.preventDefault();const st=S.studio;st.z=clamp(st.z*(e.deltaY<0?1.08:1/1.08),1,10);drawVP();runExtract(160)},{passive:false})}
 document.addEventListener('gesturestart',e=>{if(S.studio)e.preventDefault()});
 /* ---------- scan studio ---------- */
