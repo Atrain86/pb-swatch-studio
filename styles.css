@@ -240,5 +240,7 @@ body.kb .results{bottom:calc(var(--sh) + var(--kb) + var(--db))}
 .fcpanel .pad{background:rgba(255,255,255,.08)}
 .sbox input::placeholder{font-size:14px}
 .livepal div{cursor:default}
+.infobtn{color:var(--fg2)}
+.infobtn.on{color:#fff;border-color:rgba(255,255,255,.55)}
 @media (prefers-reduced-motion: reduce){.chip,.toast,.vphint{transition:none}}
 input[type=search]::-webkit-search-cancel-button,input[type=search]::-webkit-search-decoration{-webkit-appearance:none;display:none}
