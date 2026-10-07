@@ -212,5 +212,17 @@ body.kb .results{bottom:calc(var(--sh) + var(--kb) + var(--db))}
 .nmwrap{position:relative;flex:1;min-width:0}
 .nmwrap input{padding-right:84px}
 .nmsug{position:absolute;right:4px;top:50%;transform:translateY(-50%);height:30px;padding:0 10px;border-radius:9px;font-size:13px;color:var(--fg2);background:var(--s3)}
+.stchip.sel{outline:2.5px solid #fff;outline-offset:2px;z-index:1}
+.stchip .chx{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;display:flex;align-items:center;justify-content:center}
+.stchip .chx svg{width:12px;height:12px}
+.vphint{left:10px;right:52px}
+.dotsbtn{position:absolute;right:10px;bottom:10px;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.55);color:rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;z-index:4;border:1.5px solid rgba(255,255,255,.25)}
+.dotsbtn.on{color:#fff;border-color:#fff}
+.dotsbtn svg{width:20px;height:20px}
+.vpw{position:relative}
+.stbar{position:sticky;bottom:calc(-16px - env(safe-area-inset-bottom,0px));margin:14px -16px 0;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:var(--s1);border-top:1px solid var(--line);z-index:6}
+.fullc{position:fixed;inset:0;z-index:90;display:flex;align-items:flex-end;justify-content:center;padding-bottom:calc(30px + env(safe-area-inset-bottom,0px))}
+.fullc span{font-family:var(--mono);font-size:14px;opacity:.75}
+.hgrid .lcard .nm{font-size:13px}
 @media (prefers-reduced-motion: reduce){.chip,.toast,.vphint{transition:none}}
 input[type=search]::-webkit-search-cancel-button,input[type=search]::-webkit-search-decoration{-webkit-appearance:none;display:none}
