@@ -86,10 +86,10 @@ input.name{height:38px;font-weight:600}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nh) + var(--sh) + var(--db) + 14px);background:var(--s3);color:var(--fg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:70;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center;border:1px solid var(--line2)}
 .toast.show{opacity:1}
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:40;display:flex;align-items:flex-end;justify-content:center}
-.sheet{width:100%;max-width:520px;max-height:96%;overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--s1);border-radius:22px 22px 0 0;padding:6px 16px calc(16px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--edge)}
+.sheet{width:100%;max-width:520px;max-height:96%;overflow-y:auto;background:var(--s1);border-radius:22px 22px 0 0;padding:6px 16px calc(16px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--edge)}
 .handle{width:42px;height:5px;border-radius:3px;background:var(--line2);margin:2px auto 8px}
 .vp{position:relative;width:100%;aspect-ratio:1;border-radius:16px;overflow:hidden;touch-action:none;background:#000;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
-.vpw{position:relative;width:min(100%,44vh);margin:0 auto;transition:width .2s}
+.vpw{position:relative;width:min(100%,44vh);margin:0 auto}
 .vpw.short{width:min(100%,27vh)}
 .vp canvas{display:block;width:100%;height:100%}
 .vphint{position:absolute;left:10px;right:10px;bottom:10px;text-align:center;font-size:12.5px;color:#fff;background:rgba(0,0,0,.55);padding:7px 10px;border-radius:10px;pointer-events:none;transition:opacity .4s}
@@ -224,7 +224,9 @@ body.kb .results{bottom:calc(var(--sh) + var(--kb) + var(--db))}
 .fullc{position:fixed;inset:0;z-index:90;display:flex;align-items:flex-end;justify-content:center;padding-bottom:calc(30px + env(safe-area-inset-bottom,0px))}
 
 .hgrid .lcard .nm{font-size:13px}
-.vp canvas{position:absolute;inset:0;width:100%;height:100%}
+.vp canvas{position:absolute;left:0;top:0;width:100%;height:100%}
+.vp{transform:translateZ(0);background:#000}
+.vpw>.vphint{z-index:4}
 .vphint.gone{display:none}
 .sthint{margin:-2px 0 6px;font-size:12px}
 .fcx{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:14px;width:42px;height:42px;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;display:flex;align-items:center;justify-content:center}
