@@ -83,7 +83,7 @@ input[type=text]:focus,input[type=search]:focus,textarea:focus{border-color:var(
 input::placeholder,textarea::placeholder{color:var(--muted)}
 input.name{height:38px;font-weight:600}
 .sticky{position:sticky;top:calc(var(--hh) + env(safe-area-inset-top,0px));z-index:10;margin:-14px -16px 14px;padding:12px 16px;background:var(--bg);border-bottom:1px solid var(--edge);max-height:calc(100vh - var(--hh) - var(--nh) - var(--sh) - 24px);overflow-y:auto;overscroll-behavior:contain}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nh) + var(--sh) + var(--db) + 14px);background:var(--s3);color:var(--fg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:70;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center;border:1px solid var(--line2)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nh) + var(--sh) + var(--db) + 14px);background:var(--s3);color:var(--fg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:120;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center;border:1px solid var(--line2)}
 .toast.show{opacity:1}
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:40;display:flex;align-items:flex-end;justify-content:center}
 .sheet{width:100%;max-width:520px;max-height:96%;overflow-y:auto;background:var(--s1);border-radius:22px 22px 0 0;padding:6px 16px calc(16px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--edge)}
