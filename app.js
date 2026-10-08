@@ -246,7 +246,7 @@ a:{state:()=>{const d=S.draft;if(!d||d.sel==null||!d.base[d.sel])return null;con
 let PD=null,lastTouch=0;
 function padDown(x,el){const pad=el&&el.closest&&el.closest('.pad');if(!pad)return false;const r=pad.getBoundingClientRect();const kn=pad.querySelector('.knob');let off=0;if(kn){const kr=kn.getBoundingClientRect();off=x-(kr.left+kr.width/2);if(Math.abs(off)>30)return false}
 if(pad.dataset.trk){const T=TRK[pad.dataset.trk];if(!T)return false;if(['stk','stl','stb'].includes(pad.dataset.trk))stPush();if(pad.dataset.trk==='variety'&&S.likeHex.length<50&&!S.tasteHinted){S.tasteHinted=true;persist();toast('For the best results, keep picking colors in Start here first',3500)}PD={pad,r,trk:T,off}}
-else if(pad.dataset.rel){const[g,k]=pad.dataset.rel.split(':');const R=REL[g];const st=R&&R.state();if(!st)return false;PD={pad,r,rel:R,g,k,st,x0:x,f0:relF(st,k)}}else return false;
+else if(pad.dataset.rel){const[g,k]=pad.dataset.rel.split(':');if(g==='m'&&FC.stream&&!FC.frozen)fcFreeze(true);const R=REL[g];const st=R&&R.state();if(!st)return false;PD={pad,r,rel:R,g,k,st,x0:x,f0:relF(st,k)}}else return false;
 pad.classList.add('act');padMove(x);return true}
 function padMove(x){if(!PD)return;const{pad,r}=PD;const kn=pad.querySelector('.knob');
 if(PD.trk){const f=clamp((x-PD.off-r.left-14)/(r.width-28),0,1);if(kn)kn.style.left=`calc(14px + ${f.toFixed(4)} * (100% - 28px))`;PD.trk.set(f,pad)}
@@ -431,20 +431,22 @@ const[vx,vy]=camToVideo(v,tx,ty);const hex=camSample(v,vx,vy);const sc=Math.min(
 if(navigator.vibrate)try{navigator.vibrate(10)}catch(_){}camStop();if(S.view!=='match')go('match');openStudio({img:cv,single:true,matchHex:hex,matchXY:{x:vx/v.videoWidth,y:vy/v.videoHeight}})}
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&CAM.stream)camStop()});
 
-/* Camera window inside full screen: the real surface, live, framed by the colour you are matching.
-   Tap it to freeze the view on that spot (tap again to go live); "Use this color" takes the colour under the ring. */
-const FC={stream:null,frozen:false,pt:null,raf:0};
-function fcStop(){cancelAnimationFrame(FC.raf);FC.raf=0;if(FC.stream){FC.stream.getTracks().forEach(t=>t.stop());FC.stream=null}FC.frozen=false;FC.pt=null;const p=$('fcprev');if(p)p.remove();const b=$('fcambtn');if(b){b.classList.remove('pri');b.innerHTML=ICON.camera+'Camera'}const u=$('fcuse');if(u)u.remove()}
-function fcTag(){const t=$('fctag');if(t)t.textContent=FC.frozen?'Frozen · tap to go live':'Live · tap to freeze'}
+/* Camera inside full screen: while live, the whole screen takes the colour under the ring in the
+   small camera window, so you hold the phone to the wall and watch the big colour follow it.
+   Freeze locks that colour; then the sliders fine-tune it (moving a slider also freezes). */
+const FC={stream:null,frozen:false,raf:0,ok:null,last:0};
+function fcStop(){cancelAnimationFrame(FC.raf);FC.raf=0;if(FC.stream){FC.stream.getTracks().forEach(t=>t.stop());FC.stream=null}FC.frozen=false;FC.ok=null;const p=$('fccam');if(p)p.remove();const b=$('fcambtn');if(b){b.classList.remove('pri');b.innerHTML=ICON.camera+'Camera'}}
 function fcSay(msg){const row=document.querySelector('#fullc .fcpanel .row');if(!row)return;let el=$('fcmsg');if(!el){row.insertAdjacentHTML('afterend','<div class="lbl" id="fcmsg" style="color:#fff;margin:-2px 0 8px"></div>');el=$('fcmsg')}el.textContent=msg}
-async function fcStart(){const host=document.querySelector('#fullc .fcc');if(!host)return;const m=$('fcmsg');if(m)m.remove();if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){fcSay('The camera can’t open in this view. Open ColorShare in Safari or Chrome (the live site) to use it.');return}
-host.insertAdjacentHTML('beforeend',`<div class="fcprev" id="fcprev"><video id="fcvid" playsinline muted autoplay></video><div class="camret" id="fcret"></div><div class="fctag" id="fctag">Starting camera…</div></div>`);
+function fcPaintBtn(){const b=$('fcfreeze');if(b){b.innerHTML=FC.frozen?ICON.camera+'Go live':'<span class="recdot"></span>Freeze';b.classList.toggle('pri',!FC.frozen)}const t=$('fctag');if(t)t.textContent=FC.frozen?'Frozen':'Live'}
+function fcFreeze(on){if(!FC.stream)return;const v=$('fcvid');FC.frozen=on;if(on){if(v)v.pause();syncKnobs('m')}else{FC.ok=null;const m=curMatch();if(m)m.off={L:0,W:0,C:0};syncKnobs('m');if(v)v.play().catch(()=>{})}fcPaintBtn()}
+async function fcStart(){const host=document.querySelector('#fullc .fcc');if(!host)return;const msg=$('fcmsg');if(msg)msg.remove();if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){fcSay('The camera can’t open in this view. Open ColorShare in Safari or Chrome (the live site) to use it.');return}
+host.insertAdjacentHTML('beforeend',`<div class="fccam" id="fccam"><div class="fcprev" id="fcprev"><video id="fcvid" playsinline muted autoplay></video><div class="camret"></div><div class="fctag" id="fctag">Starting…</div></div><button class="btn fcfreeze" id="fcfreeze" data-a="fcfreeze">Freeze</button></div>`);
 try{FC.stream=await Promise.race([navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:960}}}),new Promise((_,rj)=>setTimeout(()=>rj({name:'Timeout'}),10000))])}catch(e){fcStop();fcSay(e&&e.name==='NotAllowedError'?'Camera access is blocked here. In the Claude app preview the camera can’t open; on the live site, allow camera access when asked.':'The camera didn’t start in this view. Try it on the live site in Safari or Chrome.');return}
-if(!$('fcprev')){fcStop();return}const v=$('fcvid');v.srcObject=FC.stream;try{await v.play()}catch(e){}
-const b=$('fcambtn');if(b){b.classList.add('pri');b.innerHTML=ICON.camera+'Camera on'}const row=document.querySelector('#fullc .fcpanel .row');if(row&&!$('fcuse'))row.insertAdjacentHTML('afterend',`<div class="row" id="fcuse" style="margin:-2px 0 8px;gap:8px"><span class="camsw sm" id="fcsw"></span><span class="mono sp" id="fcvhex" style="font-size:13px;color:#D8D8E0">—</span><button class="btn sm" data-a="fcusecol">Use camera color</button></div>`);
-fcTag();const pv=$('fcprev');FC.pt=null;
-pv.addEventListener('pointerdown',e=>{e.preventDefault();const r=pv.getBoundingClientRect();if(FC.frozen){FC.frozen=false;v.play().catch(()=>{});FC.pt=null;const rt=$('fcret');if(rt){rt.style.left='50%';rt.style.top='50%'}}else{FC.pt=[e.clientX,e.clientY];FC.frozen=true;v.pause();const rt=$('fcret');if(rt){rt.style.left=(e.clientX-r.left)+'px';rt.style.top=(e.clientY-r.top)+'px'}}fcTag()});
-const tick=()=>{if(!FC.stream)return;if(v.videoWidth){const r=v.getBoundingClientRect();const[x,y]=FC.pt||[r.left+r.width/2,r.top+r.height/2];const[vx,vy]=camToVideo(v,x,y);const hx=camSample(v,vx,vy);FC.hex=hx;const sw=$('fcsw');if(sw)sw.style.background=hx;const h=$('fcvhex');if(h)h.textContent='Camera '+hx}FC.raf=requestAnimationFrame(tick)};FC.raf=requestAnimationFrame(tick)}
+if(!$('fccam')){fcStop();return}const v=$('fcvid');v.srcObject=FC.stream;try{await v.play()}catch(e){}
+const b=$('fcambtn');if(b){b.classList.add('pri');b.innerHTML=ICON.camera+'Camera on'}
+const m0=curMatch();if(m0)m0.off={L:0,W:0,C:0};syncKnobs('m');FC.frozen=false;FC.ok=null;fcPaintBtn();
+const tick=t=>{if(!FC.stream)return;if(!FC.frozen&&v.videoWidth&&t-FC.last>60){FC.last=t;const r=v.getBoundingClientRect();const[vx,vy]=camToVideo(v,r.left+r.width/2,r.top+r.height/2);const o=hexOk(camSample(v,vx,vy));
+FC.ok=FC.ok?FC.ok.map((x,i)=>x+(o[i]-x)*0.35):o;const hx=okHex(FC.ok);const m=curMatch();if(m){const[L,C,h]=hexLch(hx);Object.assign(m,{orig:hx,L,C,h});paintMatch()}}FC.raf=requestAnimationFrame(tick)};FC.raf=requestAnimationFrame(tick)}
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&FC.stream)fcStop()});
 
 /* ---------- Palettes from one colour: classic colour-harmony rules in OKLCH, ranked by your taste ---------- */
@@ -728,7 +730,7 @@ mbig:()=>{const m=curMatch();if(!m)return;m.big=!m.big;if(S.studio&&S.studio.mat
 mreset:()=>{const m=curMatch();if(!m)return;resetMatch(m);reMatch();paintMatch();syncKnobs('m')},
 fullclose:()=>{fcStop();const f=$('fullc');if(f)f.remove();syncKnobs('m')},
 fcam:()=>{if(FC.stream||$('fcprev'))fcStop();else fcStart()},
-fcusecol:()=>{const m=curMatch();if(!m||!FC.hex)return;const[L,C,h]=hexLch(FC.hex);Object.assign(m,{orig:FC.hex,L,C,h,off:{L:0,W:0,C:0}});paintMatch();syncKnobs('m');if(S.studio&&S.studio.match)renderStudio();toast('Matching from the camera color')},
+fcfreeze:()=>fcFreeze(!FC.frozen),
 muse:()=>{if(S.studio&&S.studio.match){studioUse();return}const mo=S.mo;if(!mo)return;const adj=lchHex(mo.m.L,mo.m.C,mo.m.h);mo.colors[mo.ti]=adj;mo.m.orig=mo.m.tgt=adj;renderSheet2();toast('Color updated')},
 matchback:()=>{S.studio.match=null;renderStudio()},
 moclose:()=>{S.mo=null;renderSheet2()},
