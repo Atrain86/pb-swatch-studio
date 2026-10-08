@@ -295,3 +295,14 @@ html:has(.hgrid.c1){scroll-snap-type:y proximity}
 .batchgrid img{width:100%;border-radius:10px;display:block}
 html:has(.hgrid.c1) #main>:first-child,html:has(.hgrid.c1) #main .grp{scroll-snap-align:start;scroll-margin-top:calc(var(--hh) + env(safe-area-inset-top,0px) + 14px)}
 .infobtn svg{width:21px;height:21px}
+/* share the app: a labelled pill, so it never reads as sharing a palette */
+.hsharepill{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 11px 0 9px;margin-right:-4px;border-radius:16px;border:1px solid var(--line2);background:var(--s2);color:#fff;font-size:12.5px;font-weight:600;white-space:nowrap;flex-shrink:0}
+.hsharepill svg{width:15px;height:15px}
+/* sliders: a ball you grab; touching elsewhere on the bar just scrolls the page */
+.pad{touch-action:pan-y}
+.pad .knob{width:30px;height:30px;border-radius:50%;background:var(--s3);border:2.5px solid #fff;box-shadow:0 2px 7px rgba(0,0,0,.55);opacity:1;z-index:1;transition:transform .12s,border-color .12s}
+.pad.slim .knob{width:26px;height:26px}
+.pad.rel .knob{opacity:1;left:50%;transition:left .18s ease-out,transform .12s,border-color .12s}
+.pad.act .knob{border-color:var(--acc);transform:translate(-50%,-50%) scale(1.12)}
+.pad.rel.act .knob{transition:transform .12s,border-color .12s}
+.pad .pmid{opacity:.5}

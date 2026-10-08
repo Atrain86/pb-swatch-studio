@@ -137,6 +137,7 @@ dots:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1
 full:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
 undo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>',
 redo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>',
+shareApp:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M17.5 6.2L6.5 12l11 5.8" fill="none"/><circle cx="17.8" cy="6" r="3.1" stroke="none"/><circle cx="6.2" cy="12" r="3.1" stroke="none"/><circle cx="17.8" cy="18" r="3.1" stroke="none"/></svg>',
 info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9.2 9.3a2.9 2.9 0 1 1 4.1 2.6c-.85.42-1.3 1.05-1.3 1.95v.55"/><circle cx="12" cy="17.6" r=".75" fill="currentColor" stroke="none"/></svg>',
 heartOn:`<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="${HEART_D}"/></svg>`
 });
@@ -235,14 +236,14 @@ m:{get:()=>curMatch(),set:v=>{Object.assign(curMatch(),v);paintMatch()}},
 a:{get:()=>{const d=S.draft;if(!d||d.sel==null||!d.base[d.sel])return null;const[L,C,h]=hexLch(d.base[d.sel]);return{L,C,h}},set:v=>{const d=S.draft;d.base[d.sel]=lchHex(v.L,v.C,v.h);repaintStrip()}}
 };
 let PD=null,lastTouch=0;
-function padDown(x,el){const pad=el&&el.closest&&el.closest('.pad');if(!pad)return false;const r=pad.getBoundingClientRect();
-if(pad.dataset.trk){const T=TRK[pad.dataset.trk];if(!T)return false;if(['stk','stl','stb'].includes(pad.dataset.trk))stPush();if(pad.dataset.trk==='variety'&&S.likeHex.length<50&&!S.tasteHinted){S.tasteHinted=true;persist();toast('For the best results, keep picking colors in Start here first',3500)}PD={pad,r,trk:T}}
+function padDown(x,el){const pad=el&&el.closest&&el.closest('.pad');if(!pad)return false;const r=pad.getBoundingClientRect();const kn=pad.querySelector('.knob');let off=0;if(kn){const kr=kn.getBoundingClientRect();off=x-(kr.left+kr.width/2);if(Math.abs(off)>30)return false}
+if(pad.dataset.trk){const T=TRK[pad.dataset.trk];if(!T)return false;if(['stk','stl','stb'].includes(pad.dataset.trk))stPush();if(pad.dataset.trk==='variety'&&S.likeHex.length<50&&!S.tasteHinted){S.tasteHinted=true;persist();toast('For the best results, keep picking colors in Start here first',3500)}PD={pad,r,trk:T,off}}
 else if(pad.dataset.rel){const[g,k]=pad.dataset.rel.split(':');const R=REL[g];const o=R&&R.get();if(!o)return false;PD={pad,r,rel:R,k,x0:x,base:{L:o.L,C:o.C,h:o.h}}}else return false;
 pad.classList.add('act');padMove(x);return true}
 function padMove(x){if(!PD)return;const{pad,r}=PD;const kn=pad.querySelector('.knob');
-if(PD.trk){const f=clamp((x-r.left-14)/(r.width-28),0,1);if(kn)kn.style.left=`calc(14px + ${f.toFixed(4)} * (100% - 28px))`;PD.trk.set(f,pad)}
+if(PD.trk){const f=clamp((x-PD.off-r.left-14)/(r.width-28),0,1);if(kn)kn.style.left=`calc(14px + ${f.toFixed(4)} * (100% - 28px))`;PD.trk.set(f,pad)}
 else{if(kn)kn.style.left=clamp(x-r.left,8,r.width-8)+'px';PD.rel.set(relAdj(PD.k,PD.base,x-PD.x0))}}
-function padUp(){if(!PD)return;const p=PD;PD=null;p.pad.classList.remove('act');if(p.trk&&p.trk.end)p.trk.end()}
+function padUp(){if(!PD)return;const p=PD;PD=null;p.pad.classList.remove('act');if(p.rel){const kn=p.pad.querySelector('.knob');if(kn)kn.style.left=''}if(p.trk&&p.trk.end)p.trk.end()}
 
 /* Match to surface: a compact preview bar, tap the chevron for a big swatch */
 const ink=h=>Lof(h)>0.66?'#111':'#fff';
@@ -285,7 +286,7 @@ function updateChecks(){const set=new Set(S.draft?S.draft.base:[]);document.quer
 /* ---------- header, nav, main ---------- */
 function titleFor(){return{discover:'Discover',pal:'Palettes',match:'Match',settings:'Settings'}[S.view]||''}
 function renderHeader(){const h=$('hdr');const sub=S.view==='build'||S.view==='gen';const logo=sub?'':`<div class="hlogo hc">${LOGO}<small>prototype 13</small></div>`;
-const share=`<button class="btn sm ghost icon hshare" data-a="shareapp" aria-label="Share ColorShare">${ICON.share}</button>`;
+const share=`<button class="hsharepill" data-a="shareapp" aria-label="Share the ColorShare app">${ICON.shareApp}<span>Share app</span></button>`;
 if(sub){h.innerHTML=`<button class="btn sm ghost icon" data-a="back" aria-label="Back" style="margin-left:-8px">${ICON.back}</button><span class="htitle">${S.view==='gen'?'From one color':'Build palettes'}</span>${share}`;return}
 h.innerHTML=`<span class="htitle">${esc(titleFor())}</span>`+logo+share}
 function navButtons(v,preview){const nb=(k,icon,label,c)=>`<${preview?'span':'button'} class="nb${v===k?' on':''}" style="--tc:${c}" ${preview?'':`data-a="go" data-v="${k}" aria-label="${label}"`}>${ICON[icon]}<span>${label}</span></${preview?'span':'button'}>`;
@@ -593,7 +594,7 @@ selshare:async()=>{if(!S.sel||!S.sel.size)return;const list=S.saved.filter(p=>S.
 batchgo:()=>{const b=S.shareBatch;if(!b)return;const files=b.cards.map(c=>c.file);try{if(navigator.canShare&&navigator.canShare({files})){navigator.share({files,title:'ColorShare palettes'}).catch(e=>{if(!e||e.name!=='AbortError')toast('Press and hold a card to save or share it',3000)});return}}catch(e){}toast('Press and hold a card to save or share it',3000)},
 batchcodes:()=>{const b=S.shareBatch;if(b)copy(b.text,'Copied the hex codes')},
 batchclose:()=>{const b=S.shareBatch;if(b)b.cards.forEach(c=>URL.revokeObjectURL(c.url));S.shareBatch=null;renderSheet2()},
-shareapp:()=>{const web=/^https?:$/.test(location.protocol)&&!/claude|anthropic|usercontent|localhost/.test(location.hostname);const url=web?location.origin+location.pathname:'';const text='ColorShare: turn the colors around you into palettes. Scan, match and share.';const fb=()=>copy(url?text+'\n'+url:text,'Copied, ready to paste and share');try{if(navigator.share){navigator.share(url?{title:'ColorShare',text,url}:{title:'ColorShare',text}).catch(e=>{if(!e||e.name!=='AbortError')fb()});return}}catch(e){}fb()},
+shareapp:()=>{const web=/^https?:$/.test(location.protocol)&&!/claude|anthropic|usercontent|localhost/.test(location.hostname);const url=web?location.origin+location.pathname:'';const text='Try ColorShare: turn the colors around you into palettes. Scan a photo, match a real color, save and share.';const fb=()=>copy(url?text+'\n'+url:text,'Copied, ready to paste and share');try{if(navigator.share){navigator.share(url?{title:'ColorShare',text,url}:{title:'ColorShare',text}).catch(e=>{if(!e||e.name!=='AbortError')fb()});return}}catch(e){}fb()},
 msave:async()=>{matchSave('color')},
 msavepal:async()=>{matchSave('palette')},
 mgen:()=>{const m=curMatch();if(!m)return;const hx=lchHex(m.L,m.C,m.h);closeStudio();openGen(hx)},
@@ -710,7 +711,7 @@ sharecodes:()=>{const sc=S.shareCard;if(sc)copy(sc.text.split('\n')[1],'Copied t
 sharecodestoggle:()=>{const sc=S.shareCard;if(!sc)return;S.shareCodes=!S.shareCodes;persist();openShare(sc.src)},
 shareclose:()=>{if(S.shareCard)URL.revokeObjectURL(S.shareCard.url);S.shareCard=null;renderSheet2()}
 };
-document.addEventListener('click',e=>{if(e.target.closest('input,textarea'))return;const t=e.target.closest('[data-a]');if(!t)return;if(t.classList.contains('sheet-bg')&&e.target!==t)return;if(Date.now()-padEnded<350&&e.target.closest('.pad'))return;const f=A[t.dataset.a];if(f)f(t.dataset.v,t)});
+document.addEventListener('click',e=>{if(e.target.closest('input,textarea'))return;if(e.target.closest('.pad')&&Date.now()-padEnded>350&&!S.padHinted){S.padHinted=true;toast('Grab the ball to slide')}const t=e.target.closest('[data-a]');if(!t)return;if(t.classList.contains('sheet-bg')&&e.target!==t)return;if(Date.now()-padEnded<350&&e.target.closest('.pad'))return;const f=A[t.dataset.a];if(f)f(t.dataset.v,t)});
 let padEnded=0;
 function commitRename(el){const id=el.dataset.id;if(S.renaming!==id)return;S.renaming=null;const p=findP(id);const v=el.value.trim();if(p&&v&&v!==p.name){p.name=uniqueName(v,id);persist();toast('Renamed '+p.name)}setTimeout(()=>{if(S.viewer)renderViewer();else renderMain()},0)}
 document.addEventListener('focusout',e=>{if(e.target.id==='rn')commitRename(e.target)});
