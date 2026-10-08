@@ -223,8 +223,16 @@ fill:{get:()=>S.fill/100,set:(f,pad)=>{S.fill=Math.round(f*100);const n=pad.quer
 far:{get:()=>S.far/100,set:f=>{S.far=Math.round(f*100)},end:()=>{buildSugg();renderMain()}}
 };
 const applyFillSoon=()=>setTimeout(applyFill,0);
-const trk=(id,left,right,o={})=>{const f=clamp(TRK[id].get(),0,1);return`<div class="pad trk${o.slim?' slim':''}" data-trk="${id}" role="slider" aria-label="${esc(left)} or ${esc(right)}"><span>${left}</span>${o.mid?'<span class="pmid"></span>':''}${o.num!=null?`<span class="pnum">${o.num}</span>`:''}<span class="knob" style="left:calc(14px + ${f.toFixed(4)} * (100% - 28px))"></span><span>${right}</span></div>`};
-const relPad=(g,k,left,right)=>`<div class="pad rel" data-rel="${g}:${k}" role="slider" aria-label="${left} or ${right}"><span>${left}</span><span class="knob"></span><span>${right}</span></div>`;
+const trk=(id,left,right,o={})=>{const f=clamp(TRK[id].get(),0,1);return`<div class="pad trk${o.slim?' slim':''}" data-trk="${id}" role="slider" aria-label="${esc(left)} or ${esc(right)}"><span>${left}</span>${o.mid?'<span class="pmid"></span>':''}<span class="knob${o.num!=null?' kn':''}" style="left:calc(14px + ${f.toFixed(4)} * (100% - 28px))">${o.num!=null?`<span class="pnum">${o.num}</span>`:''}</span><span>${right}</span></div>`};
+/* Colour sliders: the ball stays where you leave it and shows how far this colour has moved
+   from the one you picked (centre = unchanged). Each bar works from that picked colour, so
+   the three never fight each other. */
+const RD={L:375,W:333,C:300};
+const relF=(st,k)=>clamp(.5+(st?st.off[k]||0:0)/(2*RD[k]),0,1);
+const knobLeft=f=>`calc(14px + ${f.toFixed(4)} * (100% - 28px))`;
+function relCompose(orig,off){const[L,C,h]=hexLch(orig);let b={L,C,h};b=relAdj('W',b,off.W||0);b=relAdj('C',b,off.C||0);return relAdj('L',b,off.L||0)}
+function syncKnobs(g){const R=REL[g];const st=R&&R.state();document.querySelectorAll(`.pad[data-rel^="${g}:"]`).forEach(p=>{const k=p.dataset.rel.split(':')[1];const kn=p.querySelector('.knob');if(kn)kn.style.left=knobLeft(relF(st,k))})}
+const relPad=(g,k,left,right)=>{const R=REL[g];const st=R&&R.state();return`<div class="pad rel" data-rel="${g}:${k}" role="slider" aria-label="${left} or ${right}"><span>${left}</span><span class="knob" style="left:${knobLeft(relF(st,k))}"></span><span>${right}</span></div>`};
 const relPads=g=>relPad(g,'L','Darker','Lighter')+relPad(g,'W','Cooler','Warmer')+relPad(g,'C','Less color','More color');
 function relAdj(k,b,dx){let L=b.L,C=b.C,h=b.h;
 if(k==='L')L=clamp(b.L+dx*0.0008,0.06,0.98);
@@ -232,18 +240,18 @@ if(k==='W'){const steps=dx*0.12;const t=steps>0?60:250;const d=((t-b.h+540)%360)
 if(k==='C')C=Math.max(0,b.C+dx*0.0004);return{L,C,h}}
 const curMatch=()=>(S.studio&&S.studio.match)||(S.mo&&S.mo.m)||null;
 const REL={
-m:{get:()=>curMatch(),set:v=>{Object.assign(curMatch(),v);paintMatch()}},
-a:{get:()=>{const d=S.draft;if(!d||d.sel==null||!d.base[d.sel])return null;const[L,C,h]=hexLch(d.base[d.sel]);return{L,C,h}},set:v=>{const d=S.draft;d.base[d.sel]=lchHex(v.L,v.C,v.h);repaintStrip()}}
+m:{state:()=>{const m=curMatch();if(!m)return null;if(!m.off)m.off={L:0,W:0,C:0};return m},apply:v=>{Object.assign(curMatch(),v);paintMatch()}},
+a:{state:()=>{const d=S.draft;if(!d||d.sel==null||!d.base[d.sel])return null;const cur=d.base[d.sel];if(!d.ro||d.ro.i!==d.sel||d.ro.cur!==cur)d.ro={i:d.sel,orig:cur,cur,off:{L:0,W:0,C:0}};return d.ro},apply:v=>{const d=S.draft;const hx=lchHex(v.L,v.C,v.h);d.base[d.sel]=hx;d.ro.cur=hx;repaintStrip()}}
 };
 let PD=null,lastTouch=0;
 function padDown(x,el){const pad=el&&el.closest&&el.closest('.pad');if(!pad)return false;const r=pad.getBoundingClientRect();const kn=pad.querySelector('.knob');let off=0;if(kn){const kr=kn.getBoundingClientRect();off=x-(kr.left+kr.width/2);if(Math.abs(off)>30)return false}
 if(pad.dataset.trk){const T=TRK[pad.dataset.trk];if(!T)return false;if(['stk','stl','stb'].includes(pad.dataset.trk))stPush();if(pad.dataset.trk==='variety'&&S.likeHex.length<50&&!S.tasteHinted){S.tasteHinted=true;persist();toast('For the best results, keep picking colors in Start here first',3500)}PD={pad,r,trk:T,off}}
-else if(pad.dataset.rel){const[g,k]=pad.dataset.rel.split(':');const R=REL[g];const o=R&&R.get();if(!o)return false;PD={pad,r,rel:R,k,x0:x,base:{L:o.L,C:o.C,h:o.h}}}else return false;
+else if(pad.dataset.rel){const[g,k]=pad.dataset.rel.split(':');const R=REL[g];const st=R&&R.state();if(!st)return false;PD={pad,r,rel:R,g,k,st,x0:x,f0:relF(st,k)}}else return false;
 pad.classList.add('act');padMove(x);return true}
 function padMove(x){if(!PD)return;const{pad,r}=PD;const kn=pad.querySelector('.knob');
 if(PD.trk){const f=clamp((x-PD.off-r.left-14)/(r.width-28),0,1);if(kn)kn.style.left=`calc(14px + ${f.toFixed(4)} * (100% - 28px))`;PD.trk.set(f,pad)}
-else{if(kn)kn.style.left=clamp(x-r.left,8,r.width-8)+'px';PD.rel.set(relAdj(PD.k,PD.base,x-PD.x0))}}
-function padUp(){if(!PD)return;const p=PD;PD=null;p.pad.classList.remove('act');if(p.rel){const kn=p.pad.querySelector('.knob');if(kn)kn.style.left=''}if(p.trk&&p.trk.end)p.trk.end()}
+else{const{st,k}=PD;const f=clamp(PD.f0+(x-PD.x0)/(r.width-28),0,1);st.off[k]=(f-.5)*2*RD[k];if(kn)kn.style.left=knobLeft(f);PD.rel.apply(relCompose(st.orig,st.off))}}
+function padUp(){if(!PD)return;const p=PD;PD=null;p.pad.classList.remove('act');if(p.rel)syncKnobs(p.g);if(p.trk&&p.trk.end)p.trk.end()}
 
 /* Match to surface: a compact preview bar, tap the chevron for a big swatch */
 const ink=h=>Lof(h)>0.66?'#111':'#fff';
@@ -392,13 +400,37 @@ ${S.sugg.map((p,i)=>`<div class="card"><div class="h2" style="margin-bottom:10px
 /* ---------- sheets ---------- */
 function moHTML(){const mo=S.mo;return`<div class="sheet-bg"><div class="sheet"><div class="handle"></div><div class="row" style="margin-bottom:4px"><span class="h2 sp" style="font-size:20px">Match to surface</span><button class="btn sm ghost icon" data-a="moclose" aria-label="Close">${ICON.close}</button></div><div class="lbl" style="margin-bottom:10px">Tap the color to match. Hold your phone next to the real surface and slide each bar until they look the same.</div><div style="display:flex;gap:3px;margin-bottom:10px">${mo.colors.map((h,i)=>`<div class="stchip${i===mo.ti?' tgt':''}" style="background:${h};height:42px" data-a="moti" data-v="${i}" role="button" aria-label="Match ${h}"></div>`).join('')}</div>${matchPrev(mo.m)}<div style="margin-top:10px">${relPads('m')}</div><div class="row" style="margin-top:2px"><button class="btn big ghost" data-a="mreset">Reset</button><button class="btn big" style="flex:1" data-a="muse">Use this color</button></div><div class="row" style="margin-top:8px"><button class="btn big ghost" data-a="moclose">Cancel</button><button class="btn big pri" style="flex:1" data-a="modone">Done</button></div></div></div>`}
 /* ---------- Match tab ---------- */
-async function matchSave(what){const st=S.studio;if(!st||!st.match)return;const typed=stNameInput();const m=st.match;const adj=lchHex(m.L,m.C,m.h);let colors,name,tags=[];if(what==='palette'){const g=st.live||livePalN(adj,Math.max(2,st.mk||5));if(!g)return;colors=[...g.colors];name=g.name;if(g.roles)tags=['House scheme']}else{colors=[adj];name=typed||`${word(adj)} match`}
+async function matchSave(what){const st=S.studio;if(!st||!st.match)return;const typed=stNameInput();const m=st.match;const adj=lchHex(m.L,m.C,m.h);let colors,name,tags=[];if(what==='palette'){const pn=$('mpn');if(pn&&pn.value.trim())st.palName=pn.value.trim();const g=st.live||livePalN(adj,Math.max(2,st.mk||5));if(!g)return;colors=[...g.colors];name=st.palName||g.name;if(g.roles)tags=['House scheme']}else{colors=[adj];name=typed||`${word(adj)} match`}
 const pid=await storePhoto(st);const old=what==='color'&&st.editId&&findP(st.editId);const rec={name:old&&!typed?old.name:name,colors,src:'Matched',matchHex:adj,tags:old?[...(old.tags||[])]:tags,mine:true,source:null,photoId:pid,fav:old?old.fav:undefined,scan:{z:st.z,cx:st.cx,cy:st.cy,k:1,added:[{hex:m.orig,x:m.x??.5,y:m.y??.5}],off:[],light:0,bold:0}};
 if(old){rec.newName=name;S.confirm={kind:'match',orig:old.name,colors,rec};renderSheet2();return}matchDone(savePalette(rec,null))}
 function matchDone(r){closeStudio();S.confirm=null;renderSheet2();go('match');toast(r.colors.length>1?'Saved to Palettes: '+r.name:'Saved '+r.name,2600)}
 function matchHTML(){const ms=S.saved.filter(isMatch);
-return`<div class="card" style="text-align:center;padding:22px 16px 18px"><div style="color:var(--n4);display:flex;justify-content:center;margin-bottom:8px"><span style="width:44px;height:44px;display:inline-flex">${ICON.match}</span></div><div class="h2" style="font-size:20px">Match one exact color</div><div class="lbl" style="margin:6px 0 16px">Photograph a wall, a boat, a fabric. Pick the spot, then fine-tune on a large preview held next to the real thing.</div><button class="btn big pri" style="width:100%;margin-bottom:8px" data-a="matchcam">${ICON.camera}Take photo</button><button class="btn big" style="width:100%" data-a="matchlib">${ICON.library}Choose photo</button></div>
+return`<div class="card" style="text-align:center;padding:22px 16px 18px"><div style="color:var(--n4);display:flex;justify-content:center;margin-bottom:8px"><span style="width:44px;height:44px;display:inline-flex">${ICON.match}</span></div><div class="h2" style="font-size:20px">Match one exact color</div><div class="lbl" style="margin:6px 0 16px">Point the camera at a wall, a boat, a fabric and tap the color to freeze it. Then fine-tune on a large preview held next to the real thing.</div><button class="btn big pri" style="width:100%;margin-bottom:8px" data-a="livecam">${ICON.camera}Live camera</button><button class="btn big" style="width:100%" data-a="matchlib">${ICON.library}Choose photo</button></div>
 ${ms.length?`<div class="row" style="margin:18px 0 10px"><span class="h2 sp">Your matches</span><span class="lbl">${ms.length}</span></div>${gridOf(ms)}`:''}`}
+/* ---------- Live camera for Match: aim, tap the colour to freeze it, then fine-tune ----------
+   The colour is the average of a small patch under the ring, so camera noise does not jump it around. */
+const CAM={stream:null,raf:0,pt:null,box:null};
+const camCtx=(()=>{let c=null;return()=>{if(!c){const cv=document.createElement('canvas');cv.width=cv.height=24;c=cv.getContext('2d',{willReadFrequently:true})}return c}})();
+function camToVideo(v,tx,ty){const r=v.getBoundingClientRect();const vw=v.videoWidth,vh=v.videoHeight;const sc=Math.max(r.width/vw,r.height/vh);const ox=(r.width-vw*sc)/2,oy=(r.height-vh*sc)/2;return[clamp((tx-r.left-ox)/sc,0,vw-1),clamp((ty-r.top-oy)/sc,0,vh-1)]}
+function camSample(v,vx,vy){const R=Math.max(4,Math.round(Math.min(v.videoWidth,v.videoHeight)*0.012));const c=camCtx();c.drawImage(v,vx-R,vy-R,2*R,2*R,0,0,24,24);const d=c.getImageData(0,0,24,24).data;let r=0,g=0,b=0;for(let i=0;i<d.length;i+=4){r+=d[i];g+=d[i+1];b+=d[i+2]}const n=d.length/4*255;return toHex(r/n,g/n,b/n)}
+function camStop(){cancelAnimationFrame(CAM.raf);CAM.raf=0;if(CAM.stream){CAM.stream.getTracks().forEach(t=>t.stop());CAM.stream=null}const el=$('camv');if(el)el.remove();lockScroll()}
+function camRing(x,y){const ring=$('camret');if(ring){ring.style.left=x+'px';ring.style.top=y+'px'}}
+async function camOpen(){camStop();const el=document.createElement('div');el.className='camv';el.id='camv';
+el.innerHTML=`<video id="camvid" playsinline muted autoplay></video><div class="camret" id="camret"></div><button class="fcx" data-a="camclose" aria-label="Close camera">${ICON.close}</button><div class="campanel"><div class="row" style="gap:10px"><div class="camsw" id="camsw"></div><div class="sp" style="min-width:0"><div class="mono" id="camhex" style="color:#fff;font-size:14px">—</div><div class="lbl" id="camtip" style="color:#D8D8E0">Starting camera…</div></div><button class="camshut" data-a="camshoot" aria-label="Freeze this color"></button></div></div>`;
+document.body.appendChild(el);document.body.style.overflow='hidden';
+const fail=msg=>{const t=$('camtip');if(t)t.innerHTML=esc(msg);const p=el.querySelector('.campanel .row');if(p&&!el.querySelector('[data-a=camfallback]'))p.insertAdjacentHTML('beforeend',`<button class="btn sm" data-a="camfallback">Photo camera</button>`);const sh=el.querySelector('.camshut');if(sh)sh.remove()};
+if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){fail('Live camera isn’t available here. Use the photo camera instead.');return}
+try{CAM.stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}})}catch(e){fail(e&&e.name==='NotAllowedError'?'Camera access is turned off for ColorShare. Allow it in your browser settings, or use the photo camera.':'The live camera couldn’t start here. Use the photo camera instead.');return}
+if(!$('camv')){camStop();return}const v=$('camvid');v.srcObject=CAM.stream;try{await v.play()}catch(e){}
+const tip=$('camtip');if(tip)tip.textContent='Tap the color to freeze it, or tap the button for the centre';
+const r0=v.getBoundingClientRect();CAM.pt=null;camRing(r0.width/2,r0.height/2);
+const tick=()=>{if(!CAM.stream)return;if(v.videoWidth){const r=v.getBoundingClientRect();const[x,y]=CAM.pt||[r.left+r.width/2,r.top+r.height/2];const[vx,vy]=camToVideo(v,x,y);const hx=camSample(v,vx,vy);const sw=$('camsw');if(sw)sw.style.background=hx;const h=$('camhex');if(h)h.textContent=hx}CAM.raf=requestAnimationFrame(tick)};CAM.raf=requestAnimationFrame(tick);
+v.addEventListener('pointerdown',e=>{e.preventDefault();camFreeze(e.clientX,e.clientY)})}
+function camFreeze(tx,ty){const v=$('camvid');if(!v||!v.videoWidth||!CAM.stream)return;const r=v.getBoundingClientRect();if(tx==null){tx=r.left+r.width/2;ty=r.top+r.height/2}camRing(tx-r.left,ty-r.top);
+const[vx,vy]=camToVideo(v,tx,ty);const hex=camSample(v,vx,vy);const sc=Math.min(1,1600/Math.max(v.videoWidth,v.videoHeight));const cv=document.createElement('canvas');cv.width=Math.round(v.videoWidth*sc);cv.height=Math.round(v.videoHeight*sc);cv.getContext('2d').drawImage(v,0,0,cv.width,cv.height);
+if(navigator.vibrate)try{navigator.vibrate(10)}catch(_){}camStop();if(S.view!=='match')go('match');openStudio({img:cv,single:true,matchHex:hex,matchXY:{x:vx/v.videoWidth,y:vy/v.videoHeight}})}
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&CAM.stream)camStop()});
+
 /* ---------- Palettes from one colour: classic colour-harmony rules in OKLCH, ranked by your taste ---------- */
 const GEN=[['house','House scheme','Body, trim, accent and door for a building'],['tonal','Tonal','One hue, light to dark'],['analog','Analogous','Neighbouring hues, calm and natural'],['comp','Complementary','One contrasting accent'],['split','Split complementary','Two contrasting accents'],['earthy','Earthy','Softened and weathered']];
 const J=a=>rnd(-a,a);const LC=(L,C,h)=>lchHex(clamp(L,.08,.97),Math.max(0,C),((h%360)+360)%360);
@@ -425,7 +457,7 @@ for(const gap of [8,5,3])for(const k of kinds){if(cols.length>=n)break;for(const
 cols.sort((a,b)=>Lof(a)-Lof(b));return{...g,colors:cols,roles:cols.length===g.colors.length&&g.colors.every(c=>cols.includes(c))?g.roles:null}})}
 function livePal(hex){const t=S.mt||'best',seed=S.mseed||1;return withSeed(seed,()=>{if(t!=='best')return genOptions(t,hex)[0];let best=null;['tonal','analog','comp','split','earthy'].forEach(k=>{const o=genOptions(k,hex)[0];if(o&&(!best||o.sc>best.sc))best=o});return best})}
 const liveStrip=(g,id,h)=>`<div class="pal livepal" id="${id}" style="height:${h}px">${g.colors.map(c=>`<div style="background:${c}"></div>`).join('')}</div>`;
-let lvRaf=0;function paintLive(){if(lvRaf)return;lvRaf=requestAnimationFrame(()=>{lvRaf=0;const m=curMatch();if(!m||!(S.studio&&S.studio.single)||(S.studio.mk||1)<2)return;const g=livePalN(lchHex(m.L,m.C,m.h),S.studio.mk);if(!g)return;S.studio.live=g;['livepal'].forEach(id=>{const el=$(id);if(!el)return;if(el.children.length!==g.colors.length)el.innerHTML=g.colors.map(c=>`<div style="background:${c}"></div>`).join('');[...el.children].forEach((d,i)=>d.style.background=g.colors[i])});const n=$('livename');if(n)n.textContent=g.name+(g.roles?' · '+g.roles.join(', '):'')})}
+let lvRaf=0;function paintLive(){if(lvRaf)return;lvRaf=requestAnimationFrame(()=>{lvRaf=0;const m=curMatch();if(!m||!(S.studio&&S.studio.single)||(S.studio.mk||1)<2)return;const g=livePalN(lchHex(m.L,m.C,m.h),S.studio.mk);if(!g)return;S.studio.live=g;['livepal'].forEach(id=>{const el=$(id);if(!el)return;if(el.children.length!==g.colors.length)el.innerHTML=g.colors.map(c=>`<div style="background:${c}"></div>`).join('');[...el.children].forEach((d,i)=>d.style.background=g.colors[i])});const n=$('livename');if(n&&!S.studio.palName)n.textContent=g.name+(g.roles?' · '+g.roles.join(', '):'')})}
 function fullColor(hex){const old=$('fullc');if(old)old.remove();const d=document.createElement('div');d.className='fullc';d.id='fullc';const live=!!curMatch();
 d.innerHTML=`<div class="fcc" style="background:${hex}"><button class="fcx" data-a="fullclose" aria-label="Close full screen">${ICON.close}</button></div><div class="fcpanel"><div class="row" style="margin-bottom:8px"><span class="mono sp" id="fchex" style="font-size:14px;color:#fff">${hex}</span>${live?'<button class="btn sm ghost" data-a="mreset" style="color:#fff">Reset</button>':''}</div>${live?relPads('m'):''}</div>`;document.body.appendChild(d)}
 async function storePhoto(st){let pid=st.photoId;if(pid||st.noPhoto)return pid||null;pid=uid();let q=0.82,data=st.src.toDataURL('image/jpeg',q);while(data.length>150000&&q>0.5){q-=0.08;data=st.src.toDataURL('image/jpeg',q)}const t=document.createElement('canvas');t.width=t.height=240;const side=Math.min(st.iw,st.ih);t.getContext('2d').drawImage(st.src,(st.iw-side)/2,(st.ih-side)/2,side,side,0,0,240,240);const ok=await DB.put({id:pid,data,thumb:t.toDataURL('image/jpeg',0.8),created:Date.now()});if(!ok&&!DB.db)toast('Photo kept for this visit only',2500);return pid}
@@ -495,7 +527,7 @@ const[x,y]=pts[0];if(g.mode==='pend'){g.lx=x;g.ly=y;if(Math.hypot(x-g.sx,y-g.sy)
 if(g.mode==='pan'){const side=region().side;st.cx=g.cx-(x-g.sx)/W()*side/st.iw;st.cy=g.cy-(y-g.sy)/W()*side/st.ih;drawVP();runExtract(140)}
 else if(g.mode==='loupe'){g.lx=x;g.ly=y;loupeAt(x,y)}}
 function up(remaining,cancelled){const st=S.studio;if(!g||!st)return;if(g.t)clearTimeout(g.t);
-if(g.mode==='loupe'){hideLoupe();if(!cancelled&&st.match){const[L,C,h]=hexLch(g.hex);Object.assign(st.match,{orig:g.hex,L,C,h,x:g.ix/st.iw,y:g.iy/st.ih});renderStudio()}else if(!cancelled){const L=stLists();if(L.inc.length>=12&&!st.added.some(a=>a.hex===g.hex))toast('This palette is full at 12 colors');else if(!st.added.some(a=>a.hex===g.hex)){stPush();const n0=L.inc.length;st.added.push({hex:g.hex,x:g.ix/st.iw,y:g.iy/st.ih});st.k=Math.min(12,n0+1);st.sel=g.hex;drawVP();renderStudio()}}g=null;return}
+if(g.mode==='loupe'){hideLoupe();if(!cancelled&&st.match){const[L,C,h]=hexLch(g.hex);Object.assign(st.match,{orig:g.hex,L,C,h,x:g.ix/st.iw,y:g.iy/st.ih,off:{L:0,W:0,C:0}});renderStudio()}else if(!cancelled){const L=stLists();if(L.inc.length>=12&&!st.added.some(a=>a.hex===g.hex))toast('This palette is full at 12 colors');else if(!st.added.some(a=>a.hex===g.hex)){stPush();const n0=L.inc.length;st.added.push({hex:g.hex,x:g.ix/st.iw,y:g.iy/st.ih});st.k=Math.min(12,n0+1);st.sel=g.hex;drawVP();renderStudio()}}g=null;return}
 if(g.mode==='pinch'){if(remaining.length===1){g={mode:'idle'}}else{g=null;runExtract(0)}return}
 if(g.mode==='pend'&&!cancelled&&!st.hinted){st.hinted=true;toast('Press and hold to pick a color')}
 if(g.mode==='pan')runExtract(0);if(!remaining.length)g=null}
@@ -517,14 +549,14 @@ function stPush(){const st=S.studio;if(!st)return;st.hist=st.hist||[];st.hist.pu
 function stRestore(snap){const st=S.studio;Object.assign(st,JSON.parse(snap));st.sel=null;st.auto=extractCands();drawVP();renderStudio()}
 const snapSt=()=>{const s=S.studio;return{z:s.z,cx:s.cx,cy:s.cy,k:s.k,added:s.added,off:s.off,light:s.light,bold:s.bold,name:s.name,tags:s.tags}};
 function openStudio(o){const im=o.img;const iw0=im.naturalWidth||im.width,ih0=im.naturalHeight||im.height;const sc=Math.min(1,1200/Math.max(iw0,ih0));const src=document.createElement('canvas');src.width=Math.round(iw0*sc);src.height=Math.round(ih0*sc);const sctx=src.getContext('2d',{willReadFrequently:true});sctx.drawImage(im,0,0,src.width,src.height);
-const s=o.scan||{};S.studio={src,sctx,iw:src.width,ih:src.height,photoId:o.photoId||null,editId:o.editId||null,z:s.z||1,cx:s.cx??.5,cy:s.cy??.5,k:s.k||5,added:(s.added||[]).map(a=>({...a})),off:[...(s.off||[])],light:s.light||0,bold:s.bold||0,name:o.name||'',tags:o.tags?[...o.tags]:[],auto:[],match:null,hinted:!!o.editId,wantMatch:!!o.wantMatch,single:!!o.single,matchHex:o.matchHex||null,noPhoto:!!o.noPhoto,mk:1,first:true,sel:null,teach:o.teach!==false};S.studio.orig=JSON.stringify(snapSt());
+const s=o.scan||{};S.studio={src,sctx,iw:src.width,ih:src.height,photoId:o.photoId||null,editId:o.editId||null,z:s.z||1,cx:s.cx??.5,cy:s.cy??.5,k:s.k||5,added:(s.added||[]).map(a=>({...a})),off:[...(s.off||[])],light:s.light||0,bold:s.bold||0,name:o.name||'',tags:o.tags?[...o.tags]:[],auto:[],match:null,hinted:!!o.editId,wantMatch:!!o.wantMatch,single:!!o.single,matchHex:o.matchHex||null,noPhoto:!!o.noPhoto,matchXY:o.matchXY||null,mk:1,first:true,sel:null,teach:o.teach!==false};S.studio.orig=JSON.stringify(snapSt());
 $('ov').innerHTML=`<div class="sheet-bg"><div class="sheet" id="sheet"><div class="handle"></div><div class="row" style="margin-bottom:8px"><span class="h2 sp" style="font-size:20px" id="sttitle">${o.single?'Match a color':o.wantMatch?'Match to surface':o.editId?'Edit scan':'New scan'}</span><button class="btn sm ghost icon" data-a="stclose" aria-label="Close">${ICON.close}</button></div><div class="vpw${o.wantMatch||o.single?' short':''}" id="vpw"><div class="vp" id="vp"><canvas id="vpc"></canvas></div>${o.single||o.wantMatch?'':`<button class="dotsbtn${S.scanDots?' on':''}" data-a="scandots" aria-pressed="${S.scanDots}" aria-label="Show or hide scan points">${ICON.dots}</button>`}<div class="loupe" id="lp"><canvas id="lpc"></canvas></div><div class="loupetag" id="lpt"></div></div><div class="lbl phhint${S.helpOn||o.single||o.wantMatch?'':' gone'}" id="vphint">${o.single||o.wantMatch?'Press and hold, then move the magnifier over the color to match':'Press and hold the photo, then move the magnifier over a color to add it'}</div><div id="stdyn" style="margin-top:6px"><div class="empty" style="height:54px">Reading colors…</div></div></div></div>`;
 lockScroll();requestAnimationFrame(()=>{drawVP();runExtract();bindVP()})}
 function closeStudio(){S.studio=null;$('ov').innerHTML='';lockScroll()}
 function drawVP(){const st=S.studio;if(!st)return;const cv=$('vpc');if(!cv)return;const vpw=$('vpw'),vp=$('vp');const W=Math.round(vpw?vpw.clientWidth:cv.clientWidth),dpr=window.devicePixelRatio||1;if(!W)return;if(vp&&vp.style.height!==W+'px'){vp.style.height=W+'px';cv.style.width=W+'px';cv.style.height=W+'px'}if(cv.width!==Math.round(W*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(W*dpr)}const ctx=cv.getContext('2d');const r=region();ctx.drawImage(st.src,r.x,r.y,r.side,r.side,0,0,cv.width,cv.height);
 if(S.scanDots&&!st.single)stLists().inc.forEach(c=>{if(c.x==null)return;const px=(c.x*st.iw-r.x)/r.side*cv.width,py=(c.y*st.ih-r.y)/r.side*cv.height;if(px<0||py<0||px>cv.width||py>cv.height)return;const on=st.sel===c.hex;const rad=(on?13:c.man?9:7.5)*dpr;if(on){ctx.beginPath();ctx.arc(px,py,rad+6*dpr,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,.35)';ctx.fill()}ctx.beginPath();ctx.arc(px,py,rad,0,Math.PI*2);ctx.fillStyle=c.hex;ctx.fill();ctx.lineWidth=(on?3.5:2.2)*dpr;ctx.strokeStyle='#fff';ctx.stroke()})}
 let exT;function runExtract(delay){clearTimeout(exT);exT=setTimeout(()=>{const st=S.studio;if(!st)return;st.auto=extractCands();
-if(st.first){st.first=false;requestAnimationFrame(drawVP);if(st.single){const r=region();const hx=st.matchHex||sampleImg(r.x+r.side/2,r.y+r.side/2);const[L,C,h]=hexLch(hx);st.match={tgt:null,orig:hx,L,C,h,big:true,x:(r.x+r.side/2)/st.iw,y:(r.y+r.side/2)/st.ih};renderStudio();return}if(st.wantMatch){st.wantMatch=false;const L=stLists();if(L.inc.length){startMatch(L.inc[0].hex);return}}renderStudio();return}
+if(st.first){st.first=false;requestAnimationFrame(drawVP);if(st.single){const r=region();const hx=st.matchHex||sampleImg(r.x+r.side/2,r.y+r.side/2);const[L,C,h]=hexLch(hx);const xy=st.matchXY||{x:(r.x+r.side/2)/st.iw,y:(r.y+r.side/2)/st.ih};st.match={tgt:null,orig:hx,L,C,h,big:true,x:xy.x,y:xy.y};renderStudio();return}if(st.wantMatch){st.wantMatch=false;const L=stLists();if(L.inc.length){startMatch(L.inc[0].hex);return}}renderStudio();return}
 if(st.match)renderMatchChips();else renderStChips()},delay||0)}
 function stChipsHTML(){const st=S.studio;const L=stLists();const fin=tone(L.inc.map(c=>c.hex),st.light,st.bold);const ti=new Map(L.inc.map((c,i)=>[c.hex,fin[i]]));
 return`<div style="display:flex;gap:3px">${L.inc.map(c=>`<div class="stchip${st.sel===c.hex?' sel':''}" role="button" aria-label="${st.sel===c.hex?'Remove':'Select'} ${c.hex}" data-a="sttoggle" data-v="${c.hex}" style="background:${ti.get(c.hex)}">${st.sel===c.hex?`<span class="chx">${ICON.close}</span>`:c.man&&S.scanDots?'<span class="dot"></span>':''}</div>`).join('')||'<div class="empty" style="height:54px">No colors found</div>'}</div>
@@ -533,7 +565,8 @@ function stToolsHTML(){const st=S.studio;return`<div class="row" style="margin-t
 function renderStChips(){const c=$('stc');if(c)c.innerHTML=stChipsHTML();const tl=$('sttools');if(tl)tl.innerHTML=stToolsHTML();drawVP();const pn=document.querySelector('[data-trk=stk] .pnum');if(pn&&S.studio)pn.textContent=stLists().inc.length;const n=$('stn');if(n)n.placeholder=baseName(stFinal())||'Name your palette'}
 function matchChipsHTML(){const st=S.studio;return stLists().inc.map(c=>`<div class="stchip${c.hex===st.match.tgt?' tgt':''}" style="background:${c.hex};height:40px" data-a="mtgt" data-v="${c.hex}" role="button" aria-label="Match ${c.hex}"></div>`).join('')}
 function renderMatchChips(){const el=$('mchips');if(el)el.innerHTML=matchChipsHTML()}
-function mpalHTML(){const st=S.studio,m=st.match,n=st.mk||1;if(n<2){st.live=null;return''}const g=st.live=livePalN(lchHex(m.L,m.C,m.h),n);if(!g)return'';return`${liveStrip(g,'livepal',46)}<div class="row" style="margin:4px 0 6px"><span class="lbl sp" id="livename" style="font-size:12px">${esc(g.name)+(g.roles?' · '+g.roles.join(', '):'')}</span><button class="btn sm icon round" data-a="mshuffle" aria-label="Another palette">${ICON.shuffle}</button></div>`}
+function mpalHTML(){const st=S.studio,m=st.match,n=st.mk||1;if(n<2){st.live=null;return''}const g=st.live=livePalN(lchHex(m.L,m.C,m.h),n);if(!g)return'';const nm=st.mpEdit?`<input type="text" id="mpn" class="name sp" style="height:34px;font-size:14px" value="${esc(st.palName||g.name)}" aria-label="Name this palette" autocomplete="off" enterkeyhint="done">`:`<span class="sp mpname" id="livename" data-a="mpname" role="button" aria-label="Rename this palette">${esc(st.palName||g.name)}${!st.palName&&g.roles?' · '+g.roles.join(', '):''}</span>`;
+return`${liveStrip(g,'livepal',46)}<div class="row" style="margin:6px 0 6px;gap:8px">${nm}<button class="btn sm" data-a="mshuffle" aria-label="Try another palette in this style">${ICON.shuffle}Try another</button></div>`}
 function mstbarHTML(){const n=S.studio.mk||1;return`<button class="btn big ghost" data-a="stclose" style="padding:0 10px">Cancel</button>${n>1?`<button class="btn big" data-a="msavepal" style="padding:0 12px">Save palette</button>`:''}<button class="btn big pri" style="flex:1;padding:0 10px" data-a="msave">Save color</button>`}
 function paintMatchPal(){const st=S.studio;if(!st||!st.match)return;const p=$('mpal');if(p)p.innerHTML=mpalHTML();const b=$('mstbar');if(b)b.innerHTML=mstbarHTML();document.querySelectorAll('[data-a=mtype]').forEach(el=>el.classList.toggle('on',st.mk>1&&(S.mt||'best')===el.dataset.v))}
 function renderStudio(){const st=S.studio;if(!st)return;const host=$('stdyn');if(!host)return;stNameInput();
@@ -567,16 +600,21 @@ const findP=v=>S.saved.find(x=>x.id===v);
 /* Suggest: step through other fitting names, never repeating the current one */
 function nextName(cols,cur){const opts=[...new Set([baseName(cols),...altNames(cols)])].filter(Boolean);if(!opts.length)return cur;const i=opts.indexOf(cur);return opts[(i+1)%opts.length]===cur&&opts.length>1?opts[(i+2)%opts.length]:opts[(i+1)%opts.length]}
 function keepDraftName(){const el=$('dname');if(el&&el.value.trim()){S.draft.name=el.value;S.draft.named=true}}
-function resetMatch(m){const[L,C,h]=hexLch(m.orig);Object.assign(m,{L,C,h})}
+function resetMatch(m){const[L,C,h]=hexLch(m.orig);Object.assign(m,{L,C,h,off:{L:0,W:0,C:0}})}
 const reMatch=()=>{if(S.studio&&S.studio.match)renderStudio();else renderSheet2()};
 const A={
 go:v=>{S.armed=null;go(v)},
 back:()=>go(S.prev),
 scan:()=>{S.pendingSingle=false;S.chooser=true;renderSheet2()},
 matchcam:()=>{S.pendingSingle=true;const c=$('cam');c.value='';c.click()},
+livecam:()=>{camOpen()},
+camclose:()=>camStop(),
+camshoot:()=>camFreeze(),
+camfallback:()=>{camStop();S.pendingSingle=true;const c=$('cam');c.value='';c.click()},
 matchlib:()=>{S.pendingSingle=true;const f=$('file');f.value='';f.click()},
 mfull:()=>{S.fsplit=false;const m=curMatch();if(m)fullColor(lchHex(m.L,m.C,m.h))},
 mtype:v=>{const st=S.studio;if(!st)return;S.mt=v;if((st.mk||1)<2){st.mk=5;stNameInput();renderStudio()}else paintMatchPal()},
+mpname:()=>{const st=S.studio;if(!st)return;st.mpEdit=true;paintMatchPal();const i=$('mpn');if(i){i.focus();i.select()}},
 mshuffle:()=>{S.mseed=(S.mseed||1)+1;paintMatchPal()},
 /* Generate: the first tap turns one colour into a palette, each tap after tries the next style */
 mgenerate:()=>{const st=S.studio;if(!st||!st.match)return;stNameInput();if((st.mk||1)<2){st.mk=5;renderStudio();return}const ks=LIVE.map(x=>x[0]);S.mt=ks[(ks.indexOf(S.mt||'best')+1)%ks.length];S.mseed=(S.mseed||1)+1;paintMatchPal();const t=LIVE.find(x=>x[0]===S.mt);toast(t[1],1200)},
@@ -671,8 +709,8 @@ match:async v=>{const p=findP(v);if(!p)return;S.menu=null;S.armed=null;if(p.phot
 mtgt:v=>{startMatch(v)},
 moti:v=>{const mo=S.mo;mo.ti=+v;const hx=mo.colors[mo.ti];const[L,C,h]=hexLch(hx);mo.m={tgt:hx,orig:hx,L,C,h,big:mo.m.big};renderSheet2()},
 mbig:()=>{const m=curMatch();if(!m)return;m.big=!m.big;if(S.studio&&S.studio.match)renderStudio();else renderSheet2()},
-mreset:()=>{const m=curMatch();if(!m)return;resetMatch(m);reMatch();paintMatch()},
-fullclose:()=>{const f=$('fullc');if(f)f.remove()},
+mreset:()=>{const m=curMatch();if(!m)return;resetMatch(m);reMatch();paintMatch();syncKnobs('m')},
+fullclose:()=>{const f=$('fullc');if(f)f.remove();syncKnobs('m')},
 muse:()=>{if(S.studio&&S.studio.match){studioUse();return}const mo=S.mo;if(!mo)return;const adj=lchHex(mo.m.L,mo.m.C,mo.m.h);mo.colors[mo.ti]=adj;mo.m.orig=mo.m.tgt=adj;renderSheet2();toast('Color updated')},
 matchback:()=>{S.studio.match=null;renderStudio()},
 moclose:()=>{S.mo=null;renderSheet2()},
@@ -714,7 +752,7 @@ shareclose:()=>{if(S.shareCard)URL.revokeObjectURL(S.shareCard.url);S.shareCard=
 document.addEventListener('click',e=>{if(e.target.closest('input,textarea'))return;if(e.target.closest('.pad')&&Date.now()-padEnded>350&&!S.padHinted){S.padHinted=true;toast('Grab the ball to slide')}const t=e.target.closest('[data-a]');if(!t)return;if(t.classList.contains('sheet-bg')&&e.target!==t)return;if(Date.now()-padEnded<350&&e.target.closest('.pad'))return;const f=A[t.dataset.a];if(f)f(t.dataset.v,t)});
 let padEnded=0;
 function commitRename(el){const id=el.dataset.id;if(S.renaming!==id)return;S.renaming=null;const p=findP(id);const v=el.value.trim();if(p&&v&&v!==p.name){p.name=uniqueName(v,id);persist();toast('Renamed '+p.name)}setTimeout(()=>{if(S.viewer)renderViewer();else renderMain()},0)}
-document.addEventListener('focusout',e=>{if(e.target.id==='rn')commitRename(e.target)});
+document.addEventListener('focusout',e=>{if(e.target.id==='rn')commitRename(e.target);if(e.target.id==='mpn'&&S.studio){const v=e.target.value.trim();S.studio.palName=v||null;S.studio.mpEdit=false;setTimeout(paintMatchPal,0)}});
 document.addEventListener('focusin',e=>{if(e.target.id==='q'&&S.q.trim())renderResults();if(e.target.id==='pastebox'){const r=document.createRange();r.selectNodeContents(e.target);const s=getSelection();s.removeAllRanges();s.addRange(r)}});
 document.addEventListener('input',e=>{const el=e.target,id=el.id;
 if(id==='q'){S.q=el.value;renderResults()}
@@ -729,7 +767,7 @@ if(e.key==='Escape'&&id==='rn'){S.renaming=null;renderMain();return}
 if(e.key!=='Enter')return;
 if(id==='q'){e.preventDefault();const pp=parsePaste(S.q);if(pp&&pp.cols)A.addpaste();else e.target.blur();return}
 if(id==='nmin'){e.preventDefault();A.namesave();return}
-if(['dtag','stag','rn','creator','mname','stn'].includes(id)){e.preventDefault();e.target.blur()}});
+if(['dtag','stag','rn','creator','mname','stn','mpn'].includes(id)){e.preventDefault();e.target.blur()}});
 document.addEventListener('beforeinput',e=>{if(e.target&&e.target.id==='pastebox'&&e.inputType!=='insertFromPaste')e.preventDefault()});
 window.addEventListener('resize',()=>{if(S.studio)drawVP()});
 
