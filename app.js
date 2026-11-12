@@ -293,7 +293,7 @@ function updateChecks(){const set=new Set(S.draft?S.draft.base:[]);document.quer
 
 /* ---------- header, nav, main ---------- */
 function titleFor(){return{discover:'Discover',pal:'Palettes',match:'Match',settings:'Settings'}[S.view]||''}
-function renderHeader(){const h=$('hdr');const sub=S.view==='build'||S.view==='gen';const logo=sub?'':`<div class="hlogo hc">${LOGO}<small>prototype 13</small></div>`;
+function renderHeader(){const h=$('hdr');const sub=S.view==='build'||S.view==='gen';const logo=sub?'':`<div class="hlogo hc">${LOGO}<small>prototype 14</small></div>`;
 const share=`<button class="hsharepill" data-a="shareapp" aria-label="Share the ColorShare app">${ICON.shareApp}<span>Share app</span></button>`;
 if(sub){h.innerHTML=`<button class="btn sm ghost icon" data-a="back" aria-label="Back" style="margin-left:-8px">${ICON.back}</button><span class="htitle">${S.view==='gen'?'From one color':'Build palettes'}</span>${share}`;return}
 h.innerHTML=`<span class="htitle">${esc(titleFor())}</span>`+logo+share}
@@ -831,7 +831,11 @@ try{if(window.self!==window.top&&screen.height)document.documentElement.style.se
 renderResults();
 [['theme'],['navTheme']].forEach(([k])=>{const t=S[k];if(t&&t.cols){const m=THEMES.find(x=>x.name===t.name&&x.cols.slice(0,t.cols.length).join()===t.cols.join());if(m)S[k]=m}});
 applyTheme();
-fillPool();S.stream=streamBatch(60);persist();render();mdRestore();
+fillPool();S.stream=streamBatch(60);
+/* Opening the app lands on your favourite palettes (every visit and every refresh).
+   Someone with no favourites yet starts on Discover as before. */
+if(palAll().some(p=>p.fav)){S.view='pal';S.prev='pal';S.palF='fav'}
+persist();render();mdRestore();
 DB.open().then(()=>DB.all()).then(list=>{list.forEach(p=>MEM.set(p.id,p));if(['pal','match','settings'].includes(S.view))renderMain()});
 
 /* Clean up the old Swatch Studio service worker on phones that installed it. */
